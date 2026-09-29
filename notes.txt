@@ -1,0 +1,139 @@
+ai-powered-ecommerce/
+│
+├── app/                              # Next.js App Router
+│   │
+│   ├── (auth)/                       # Authentication pages
+│   │   ├── login/
+│   │   │   └── page.tsx
+│   │   ├── register/
+│   │   │   └── page.tsx
+│   │   ├── forgot-password/
+│   │   │   └── page.tsx
+│   │   └── reset-password/
+│   │       └── page.tsx
+│   │
+│   ├── (shop)/                       # Customer ecommerce
+│   │   ├── page.tsx                  # Home
+│   │   ├── products/
+│   │   │   ├── page.tsx
+│   │   │   └── [slug]/
+│   │   │       └── page.tsx
+│   │   ├── categories/
+│   │   │   └── [slug]/
+│   │   │       └── page.tsx
+│   │   ├── cart/
+│   │   │   └── page.tsx
+│   │   ├── checkout/
+│   │   │   └── page.tsx
+│   │   ├── orders/
+│   │   │   ├── page.tsx
+│   │   │   └── [id]/
+│   │   │       └── page.tsx
+│   │   └── wishlist/
+│   │       └── page.tsx
+│   │
+│   ├── account/
+│   │   ├── page.tsx
+│   │   └── settings/
+│   │       └── page.tsx
+│   │
+│   ├── admin/                        # Admin dashboard
+│   │   ├── page.tsx
+│   │   ├── products/
+│   │   ├── categories/
+│   │   ├── orders/
+│   │   ├── customers/
+│   │   ├── reviews/
+│   │   ├── inventory/
+│   │   └── analytics/
+│   │
+│   ├── ai/                           # AI UI
+│   │   ├── chat/
+│   │   │   └── page.tsx
+│   │   └── recommendations/
+│   │       └── page.tsx
+│   │
+│   ├── api/                          # Next.js API routes
+│   │   ├── auth/
+│   │   ├── products/
+│   │   ├── cart/
+│   │   ├── orders/
+│   │   ├── reviews/
+│   │   └── users/
+│   │
+│   ├── layout.tsx
+│   ├── loading.tsx
+│   ├── error.tsx
+│   └── not-found.tsx
+│
+├── components/                       # Reusable UI
+│   ├── ui/
+│   ├── auth/
+│   ├── product/
+│   ├── cart/
+│   ├── checkout/
+│   ├── admin/
+│   └── ai/
+│
+├── lib/                              # Application utilities
+│   ├── auth/
+│   ├── db/
+│   ├── validations/
+│   ├── utils/
+│   └── constants/
+│
+├── prisma/
+│   ├── schema.prisma
+│   ├── migrations/
+│   └── seed.ts
+│
+├── ai/                               # Python AI service
+│   │
+│   ├── app/
+│   │   ├── main.py
+│   │   │
+│   │   ├── api/
+│   │   │   ├── routes/
+│   │   │   │   ├── chat.py
+│   │   │   │   ├── recommendations.py
+│   │   │   │   ├── search.py
+│   │   │   │   ├── reviews.py
+│   │   │   │   └── forecasting.py
+│   │   │   └── dependencies.py
+│   │   │
+│   │   ├── services/
+│   │   │   ├── llm_service.py
+│   │   │   ├── recommendation_service.py
+│   │   │   ├── embedding_service.py
+│   │   │   └── search_service.py
+│   │   │
+│   │   ├── models/
+│   │   ├── schemas/
+│   │   ├── ml/
+│   │   │   ├── training/
+│   │   │   └── models/
+│   │   └── core/
+│   │       └── config.py
+│   │
+│   ├── tests/
+│   ├── requirements.txt
+│   └── Dockerfile
+│
+├── public/
+│   ├── images/
+│   └── icons/
+│
+├── tests/
+│   ├── unit/
+│   └── integration/
+│
+├── .env
+├── .env.example
+├── .gitignore
+├── Dockerfile
+├── docker-compose.yml
+├── package.json
+├── tsconfig.json
+├── next.config.ts
+├── eslint.config.mjs
+└── README.md
