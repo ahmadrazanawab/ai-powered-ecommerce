@@ -1,25 +1,47 @@
 // lib/auth/get-session.ts
 
-export type UserRole = "USER" | "VENDOR";
 
-export interface UserSession {
+import { cookies } from "next/headers";
+import { jwtVerify } from "jose";
+
+export type UserSession = {
   userId: string;
-  role: UserRole;
-}
+  role: "USER";
+  email?: string;
+};
 
 export async function getUserSession(): Promise<UserSession | null> {
-  /*
-   * MOCK ONLY
-   *
-   * In production:
-   * 1. Read JWT from httpOnly cookie / Authorization header.
-   * 2. Verify JWT signature.
-   * 3. Decode payload.
-   * 4. Return userId + role.
-   */
+  try {
+    const token = (await cookies()).get("user_token")?.value;
+    const jwtSecret = process.env.JWT_SECRET;
 
-  return {
-    userId: "00000000-0000-0000-0000-000000000001",
-    role: "USER",
-  };
+    if (!token || !jwtSecret || jwtSecret.length < 32) {
+      return null;
+    }
+
+    const secretKey = new TextEncoder().encode(jwtSecret);
+
+    const { payload } = await jwtVerify(token, secretKey, {
+      algorithms: ["HS256"],
+    });
+
+    if (
+      typeof payload.userId !== "string" ||
+      payload.role !== "USER" ||
+      payload.sub !== payload.userId
+    ) {
+      return null;
+    }
+
+    return {
+      userId: payload.userId,
+      role: "USER",
+      ...(typeof payload.email === "string"
+        ? { email: payload.email }
+        : {}),
+    };
+  } catch {
+    // Missing, malformed, expired, or invalid JWT.
+    return null;
+  }
 }
