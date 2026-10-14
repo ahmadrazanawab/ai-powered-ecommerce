@@ -2,6 +2,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createHash, randomInt } from "crypto";
 import { eq } from "drizzle-orm";
+import { SignJWT } from "jose";
 
 import { db } from "@/app/api/lib/db";
 import { users } from "@/app/api/lib/schema/users";
@@ -115,6 +116,8 @@ export async function POST(request: NextRequest) {
             expiresAt,
         });
 
+
+
         // 8. Development only: print OTP to server terminal
         if (process.env.NODE_ENV !== "production") {
             console.log(
@@ -122,9 +125,27 @@ export async function POST(request: NextRequest) {
             );
         }
 
+        // -----------------------------
+        // 9. Vendor jwt 
+        // -----------------------------
+        const secret = process.env.JWT_SECRET;
+
+        if (!secret) {
+            throw new Error("JWT_SECRET is not configured");
+        }
+        const token = await new SignJWT({
+            userId: users.id,
+            email: users.email,
+            mobileNumber:users.mobileNo
+        })
+            .setProtectedHeader({ alg: "HS256" })
+            .setIssuedAt()
+            .setExpirationTime("1d")
+            .sign(new TextEncoder().encode(secret));
+
         // TODO: Send OTP by email or SMS when delivery is integrated.
 
-        return NextResponse.json(
+        const response = NextResponse.json(
             {
                 success: true,
                 message: "OTP generated successfully. Check server terminal during development.",
@@ -132,6 +153,16 @@ export async function POST(request: NextRequest) {
             },
             { status: 200 }
         );
+
+        response.cookies.set("user_token", token, {
+            httpOnly: true,
+            secure: process.env.NODE_ENV === "production",
+            sameSite: "lax",
+            maxAge: 60 * 60 * 24, // 1 day
+            path: "/",
+        });
+
+        return response;
     } catch (error) {
         console.error("CUSTOMER_REQUEST_OTP_ERROR:", error);
 
