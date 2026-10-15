@@ -2,13 +2,13 @@
 import { NextRequest, NextResponse } from "next/server";
 import { jwtVerify } from "jose";
 
-export interface AdminTokenPayload {
+export interface VendorTokenPayload {
     vendorId: string;
     email?: string;
 }
 
-export async function verifyAdminToken(request: NextRequest): Promise<
-    | { success: true; payload: AdminTokenPayload }
+export async function verifyVendorToken(request: NextRequest): Promise<
+    | { success: true; payload: VendorTokenPayload }
     | { success: false; response: NextResponse }
 > {
     const token = request.cookies.get("vendor_token")?.value;
