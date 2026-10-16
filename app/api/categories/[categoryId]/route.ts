@@ -3,7 +3,7 @@ import { NextResponse, NextRequest } from "next/server";
 import { categorySchema } from "../../lib/schema/category-schema";
 import { db } from "../../lib/db";
 import { categoryValidation } from "../../lib/validations/category-validation";
-import { eq } from "drizzle-orm";
+import { and, eq, ne, or } from "drizzle-orm";
 import { verifyAdminToken } from "../../auth/admin/verify-token";
 
 export async function PUT(
@@ -48,24 +48,50 @@ export async function PUT(
 
         const { name, slug, description, imageUrl } = result.data;
 
-        const [updatedCategory] = await db
-            .update(categorySchema)
-            .set({
-                name,
-                slug,
-                description,
-                imageUrl,
-            })
-            .where(eq(categorySchema.id, categoryId))
-            .returning();
+        // const [updatedCategory] = await db
+        //     .update(categorySchema)
+        //     .set({
+        //         name,
+        //         slug,
+        //         description,
+        //         imageUrl,
+        //     })
+        //     .where(eq(categorySchema.id, categoryId))
+        //     .returning();
 
-        if (!updatedCategory) {
+        // if (!updatedCategory) {
+        //     return NextResponse.json(
+        //         {
+        //             success: false,
+        //             message: "Category not found",
+        //         },
+        //         { status: 404 }
+        //     );
+        // }
+
+        
+
+        const [duplicate] = await db
+            .select({ id: categorySchema.id })
+            .from(categorySchema)
+            .where(
+                and(
+                    ne(categorySchema.id, categoryId),
+                    or(
+                        eq(categorySchema.name, name),
+                        eq(categorySchema.slug, slug)
+                    )
+                )
+            )
+            .limit(1);
+
+        if (duplicate) {
             return NextResponse.json(
                 {
                     success: false,
-                    message: "Category not found",
+                    message: "Category name or slug already exists",
                 },
-                { status: 404 }
+                { status: 409 }
             );
         }
 
@@ -73,7 +99,7 @@ export async function PUT(
             {
                 success: true,
                 message: "Update category successful",
-                data: updatedCategory,
+                data: duplicate,
             },
             { status: 200 }
         );

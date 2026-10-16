@@ -1,10 +1,10 @@
-
 import { NextRequest, NextResponse } from "next/server";
 
 import { db } from "@/app/api/lib/db";
 import { categorySchema } from "@/app/api/lib/schema/category-schema";
 import { categoryValidation } from "@/app/api/lib/validations/category-validation";
 import { verifyAdminToken } from "@/app/api/auth/admin/verify-token";
+import { uploadImageToCloudinary } from "@/app/api/lib/cloudinary";
 
 import { eq, or } from "drizzle-orm";
 
@@ -30,23 +30,33 @@ export async function POST(request: NextRequest) {
             );
         }
 
-        // 3. Parse JSON body
-        let body: unknown;
+        // 3. Parse FormData
+        const formData = await request.formData();
 
-        try {
-            body = await request.json();
-        } catch {
-            return NextResponse.json(
-                {
-                    success: false,
-                    message: "Invalid JSON body",
-                },
-                { status: 400 }
+        const name = formData.get("name");
+        const slug = formData.get("slug");
+        const description = formData.get("description");
+        const image = formData.get("image");
+
+        // 4. Upload category image to Cloudinary
+        let imageUrl: string | null = null;
+
+        if (image instanceof File && image.size > 0) {
+            const uploadedImage = await uploadImageToCloudinary(
+                image,
+                "aiecommerce/categories"
             );
+
+            imageUrl = uploadedImage.url;
         }
 
-        // 4. Validate with Zod
-        const result = categoryValidation.safeParse(body);
+        // 5. Validate with Zod
+        const result = categoryValidation.safeParse({
+            name,
+            slug,
+            description: description || undefined,
+            imageUrl: imageUrl || undefined,
+        });
 
         if (!result.success) {
             return NextResponse.json(
@@ -59,9 +69,13 @@ export async function POST(request: NextRequest) {
             );
         }
 
-        const { name, slug, description, imageUrl } = result.data;
+        const {
+            name: categoryName,
+            slug: categorySlug,
+            description: categoryDescription,
+        } = result.data;
 
-        // 5. Check for existing name or slug
+        // 6. Check for existing name or slug
         const [existingCategory] = await db
             .select({
                 id: categorySchema.id,
@@ -71,14 +85,14 @@ export async function POST(request: NextRequest) {
             .from(categorySchema)
             .where(
                 or(
-                    eq(categorySchema.name, name),
-                    eq(categorySchema.slug, slug)
+                    eq(categorySchema.name, categoryName),
+                    eq(categorySchema.slug, categorySlug)
                 )
             )
             .limit(1);
 
         if (existingCategory) {
-            if (existingCategory.name === name) {
+            if (existingCategory.name === categoryName) {
                 return NextResponse.json(
                     {
                         success: false,
@@ -97,19 +111,19 @@ export async function POST(request: NextRequest) {
             );
         }
 
-        // 6. Insert category
+        // 7. Insert category
         const [category] = await db
             .insert(categorySchema)
             .values({
-                name,
-                slug,
-                description: description || null,
-                imageUrl: imageUrl || null,
+                name: categoryName,
+                slug: categorySlug,
+                description: categoryDescription || null,
+                imageUrl,
                 createdBy: auth.payload.adminId,
             })
             .returning();
 
-        // 7. Return response
+        // 8. Return response
         return NextResponse.json(
             {
                 success: true,
@@ -124,7 +138,10 @@ export async function POST(request: NextRequest) {
         return NextResponse.json(
             {
                 success: false,
-                message: "Internal server error",
+                message:
+                    error instanceof Error
+                        ? error.message
+                        : "Internal server error",
             },
             { status: 500 }
         );
@@ -132,8 +149,7 @@ export async function POST(request: NextRequest) {
 }
 
 
-
-// get all Categories
+// GET all categories
 export async function GET(_req: NextRequest) {
     try {
         const getCategories = await db
@@ -141,20 +157,29 @@ export async function GET(_req: NextRequest) {
                 categoryId: categorySchema.id,
                 name: categorySchema.name,
                 slug: categorySchema.slug,
-                imageUrl: categorySchema.imageUrl
+                description: categorySchema.description,
+                imageUrl: categorySchema.imageUrl,
             })
-            .from(categorySchema);
-        
-        return NextResponse.json({
-            success: true,
-            message: "Fetch all categories successful!",
-            data:getCategories
-        })
+            .from(categorySchema)
+            .orderBy(categorySchema.name);
+
+        return NextResponse.json(
+            {
+                success: true,
+                message: "Categories fetched successfully!",
+                data: getCategories,
+            },
+            { status: 200 }
+        );
     } catch (error) {
-        console.log("GET_CATEGORIES_ERROR", error);
-        return NextResponse.json({
-            success: false,
-            error: "Internal server error..."
-        }, { status: 500 });
+        console.error("GET_CATEGORIES_ERROR:", error);
+
+        return NextResponse.json(
+            {
+                success: false,
+                message: "Internal server error",
+            },
+            { status: 500 }
+        );
     }
 }
