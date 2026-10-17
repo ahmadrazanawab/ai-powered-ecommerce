@@ -1,15 +1,23 @@
 
 import { NextRequest, NextResponse } from "next/server";
-import { and, eq } from "drizzle-orm";
+import {
+    eq, and,
+    asc,
+    count,
+    desc,
+    ilike,
+    or,
+} from "drizzle-orm";
 
 import { db } from "../lib/db";
 import { productSchema } from "../lib/schema/product-schema";
-import { vendorProductSchema } from "../lib/schema/vendor-product-schema";
-import { vendors } from "../lib/schema/vendor";
-import { categorySchema } from "../lib/schema/category-schema";
 import { productValidation } from "../lib/validations/product-validation";
 import { verifyAdminToken } from "../auth/admin/verify-token";
 import { uploadImageToCloudinary } from "../lib/cloudinary";
+import { categorySchema } from "@/app/api/lib/schema/category-schema";
+import { vendors } from "@/app/api/lib/schema/vendor";
+import { vendorProductSchema } from "@/app/api/lib/schema/vendor-product-schema";
+
 
 export const runtime = "nodejs";
 
@@ -141,76 +149,171 @@ export async function POST(req: NextRequest) {
 
 
 
-// get all products
-export async function GET() {
-  try {
-    const products = await db
-      .select({
-        id: productSchema.id,
-        name: productSchema.name,
-        slug: productSchema.slug,
-        sku: productSchema.sku,
-        description: productSchema.description,
-        categoryId: productSchema.categoryId,
-        imageUrl: productSchema.imageUrl,
-      })
-      .from(productSchema)
-      .where(eq(productSchema.isActive, true));
 
-    return NextResponse.json({
-      success: true,
-      data: products,
-    });
-  } catch (error) {
-    console.error("GET_CATALOG_ERROR:", error);
 
-    return NextResponse.json(
-      { success: false, message: "Failed to fetch catalog" },
-      { status: 500 }
-    );
-  }
+
+
+export async function GET(request: NextRequest) {
+    try {
+        const { searchParams } = new URL(request.url);
+
+        // Search and filters
+        const search = searchParams.get("search")?.trim();
+        const categoryId = searchParams.get("categoryId");
+
+        // Pagination
+        const page = Math.max(
+            1,
+            Number.parseInt(searchParams.get("page") || "1", 10) || 1
+        );
+
+        const limit = Math.min(
+            100,
+            Math.max(
+                1,
+                Number.parseInt(searchParams.get("limit") || "12", 10) || 12
+            )
+        );
+
+        const offset = (page - 1) * limit;
+
+        // Sorting
+        const sortBy = searchParams.get("sortBy") || "newest";
+        const sortOrder = searchParams.get("sortOrder") || "desc";
+
+        if (
+            !["name", "price", "newest"].includes(sortBy) ||
+            !["asc", "desc"].includes(sortOrder)
+        ) {
+            return NextResponse.json(
+                {
+                    success: false,
+                    message: "Invalid sorting parameters",
+                },
+                { status: 400 }
+            );
+        }
+
+        // Customer visibility rules
+        const conditions = [
+            eq(productSchema.isActive, true),
+            eq(vendorProductSchema.isActive, true),
+            eq(vendors.status, "approved"),
+            eq(vendors.isActive, true),
+        ];
+
+        if (categoryId) {
+            conditions.push(eq(productSchema.categoryId, categoryId));
+        }
+
+        if (search) {
+            const searchPattern = `%${search}%`;
+
+            conditions.push(
+                or(
+                    ilike(productSchema.name, searchPattern),
+                    ilike(productSchema.slug, searchPattern),
+                    ilike(productSchema.description, searchPattern),
+                    ilike(categorySchema.name, searchPattern)
+                )!
+            );
+        }
+
+        const whereCondition = and(...conditions);
+
+        // Total number of eligible offers matching the filters
+        const [totalResult] = await db
+            .select({ total: count() })
+            .from(vendorProductSchema)
+            .innerJoin(
+                productSchema,
+                eq(vendorProductSchema.productId, productSchema.id)
+            )
+            .innerJoin(
+                vendors,
+                eq(vendorProductSchema.vendorId, vendors.id)
+            )
+            .innerJoin(
+                categorySchema,
+                eq(productSchema.categoryId, categorySchema.id)
+            )
+            .where(whereCondition);
+
+        // Sorting uses the vendor's offer price, not the catalog price
+        const orderBy =
+            sortBy === "name"
+                ? sortOrder === "asc"
+                    ? asc(productSchema.name)
+                    : desc(productSchema.name)
+                : sortBy === "price"
+                    ? sortOrder === "asc"
+                        ? asc(vendorProductSchema.price)
+                        : desc(vendorProductSchema.price)
+                    : sortOrder === "asc"
+                        ? asc(productSchema.createdAt)
+                        : desc(productSchema.createdAt);
+
+        // Fetch offers available to customers
+        const products = await db
+            .select({
+                listingId: vendorProductSchema.id,
+                productId: productSchema.id,
+                name: productSchema.name,
+                slug: productSchema.slug,
+                description: productSchema.description,
+                imageUrl: productSchema.imageUrl,
+                categoryId: categorySchema.id,
+                categoryName: categorySchema.name,
+
+                // Vendor-specific values
+                price: vendorProductSchema.price,
+                stock: vendorProductSchema.stock,
+                vendorId: vendors.id,
+                vendorName: vendors.name,
+            })
+            .from(vendorProductSchema)
+            .innerJoin(
+                productSchema,
+                eq(vendorProductSchema.productId, productSchema.id)
+            )
+            .innerJoin(
+                vendors,
+                eq(vendorProductSchema.vendorId, vendors.id)
+            )
+            .innerJoin(
+                categorySchema,
+                eq(productSchema.categoryId, categorySchema.id)
+            )
+            .where(whereCondition)
+            .orderBy(orderBy)
+            .limit(limit)
+            .offset(offset);
+
+        const total = Number(totalResult?.total ?? 0);
+
+        return NextResponse.json(
+            {
+                success: true,
+                message: "Products fetched successfully",
+                data: products,
+                pagination: {
+                    page,
+                    limit,
+                    total,
+                    totalPages: Math.ceil(total / limit),
+                },
+            },
+            { status: 200 }
+        );
+    } catch (error) {
+        console.error("GET_CUSTOMER_PRODUCTS_ERROR:", error);
+
+        return NextResponse.json(
+            {
+                success: false,
+                message: "Failed to fetch products",
+            },
+            { status: 500 }
+        );
+    }
 }
-
-
-
-// export async function GET() {
-//     try {
-//         const getProducts = await db
-//             .select({
-//                 id: productSchema.id,
-//                 categoryId: productSchema.categoryId,
-//                 name: productSchema.name,
-//                 slug: productSchema.slug,
-//                 sku: productSchema.sku,
-//                 description: productSchema.description,
-//                 price: productSchema.price,
-//                 stock: productSchema.stock,
-//                 imageUrl: productSchema.imageUrl,
-//                 isActive: productSchema.isActive,
-//                 createdBy: productSchema.createdBy,
-//                 createdAt: productSchema.createdAt,
-//                 updatedAt: productSchema.updatedAt,
-//             })
-//             .from(productSchema)
-//             .where(eq(productSchema.isActive, true));
-
-//         return NextResponse.json(
-//             {
-//                 success: true,
-//                 message: "Products fetched successfully",
-//                 data: getProducts,
-//             },
-//             { status: 200 }
-//         );
-//     } catch (error) {
-//         console.error("GET_PRODUCTS_ERROR:", error);
-
-//         return NextResponse.json(
-//             {
-//                 success: false,
-//                 message: "Failed to fetch products",
-//             },
-//             { status: 500 }
-//         );
-//     }
-// }

@@ -1,10 +1,13 @@
 import { NextResponse, NextRequest } from "next/server";
-import { eq } from "drizzle-orm";
+import { eq, and } from "drizzle-orm";
 
 import { db } from "../../lib/db";
 import { productSchema } from "../../lib/schema/product-schema";
 import { productValidation } from "../../lib/validations/product-validation";
 import { verifyAdminToken } from "../../auth/admin/verify-token";
+import { categorySchema } from "@/app/api/lib/schema/category-schema";
+import { vendors } from "@/app/api/lib/schema/vendor";
+import { vendorProductSchema } from "@/app/api/lib/schema/vendor-product-schema";
 
 export async function PUT(
     req: NextRequest,
@@ -199,6 +202,127 @@ export async function DELETE(
             {
                 success: false,
                 message: "Failed to deactivate product",
+            },
+            { status: 500 }
+        );
+    }
+}
+
+
+
+
+
+// search product
+
+export async function GET(
+    _request: NextRequest,
+    { params }: { params: Promise<{ productId: string }> }
+) {
+    try {
+        const { productId } = await params;
+
+        // Validate product UUID
+        const uuidRegex =
+            /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+        if (!uuidRegex.test(productId)) {
+            return NextResponse.json(
+                {
+                    success: false,
+                    message: "Invalid product ID",
+                },
+                { status: 400 }
+            );
+        }
+
+        // Fetch active catalog product
+        const [product] = await db
+            .select({
+                productId: productSchema.id,
+                name: productSchema.name,
+                slug: productSchema.slug,
+                description: productSchema.description,
+                imageUrl: productSchema.imageUrl,
+                categoryId: categorySchema.id,
+                categoryName: categorySchema.name,
+                createdAt: productSchema.createdAt,
+            })
+            .from(productSchema)
+            .innerJoin(
+                categorySchema,
+                eq(productSchema.categoryId, categorySchema.id)
+            )
+            .where(
+                and(
+                    eq(productSchema.id, productId),
+                    eq(productSchema.isActive, true)
+                )
+            )
+            .limit(1);
+
+        if (!product) {
+            return NextResponse.json(
+                {
+                    success: false,
+                    message: "Product not found",
+                },
+                { status: 404 }
+            );
+        }
+
+        // Fetch offers from approved and active vendors
+        const offers = await db
+            .select({
+                listingId: vendorProductSchema.id,
+                vendorId: vendors.id,
+                vendorName: vendors.name,
+                price: vendorProductSchema.price,
+                stock: vendorProductSchema.stock,
+            })
+            .from(vendorProductSchema)
+            .innerJoin(
+                vendors,
+                eq(vendorProductSchema.vendorId, vendors.id)
+            )
+            .where(
+                and(
+                    eq(vendorProductSchema.productId, productId),
+                    eq(vendorProductSchema.isActive, true),
+                    eq(vendors.status, "approved"),
+                    eq(vendors.isActive, true)
+                )
+            )
+            .orderBy(vendorProductSchema.price);
+
+        // A catalog product without eligible offers is not purchasable
+        if (offers.length === 0) {
+            return NextResponse.json(
+                {
+                    success: false,
+                    message: "Product is currently unavailable",
+                },
+                { status: 404 }
+            );
+        }
+
+        return NextResponse.json(
+            {
+                success: true,
+                message: "Product details fetched successfully",
+                data: {
+                    ...product,
+                    offers,
+                },
+            },
+            { status: 200 }
+        );
+    } catch (error) {
+        console.error("GET_CUSTOMER_PRODUCT_DETAILS_ERROR:", error);
+
+        return NextResponse.json(
+            {
+                success: false,
+                message: "Failed to fetch product details",
             },
             { status: 500 }
         );
