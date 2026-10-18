@@ -133,15 +133,26 @@ export async function POST(request: NextRequest) {
         if (!secret) {
             throw new Error("JWT_SECRET is not configured");
         }
+        console.log({
+            userId: users.id,
+            email: users.email,
+            mobileNo: users.mobileNo,
+            types: {
+                userId: typeof users.id,
+                email: typeof users.email,
+                mobileNo: typeof users.mobileNo,
+            },
+        });
         const token = await new SignJWT({
             userId: users.id,
             email: users.email,
-            mobileNumber:users.mobileNo
+            mobileNumber: users.mobileNo
         })
             .setProtectedHeader({ alg: "HS256" })
             .setIssuedAt()
             .setExpirationTime("1d")
             .sign(new TextEncoder().encode(secret));
+
 
         // TODO: Send OTP by email or SMS when delivery is integrated.
 
