@@ -57,13 +57,13 @@ export async function POST(request: NextRequest) {
           }
 
           // A late success after stock was released needs manual recovery.
-          if (order.status !== "pending_payment") {
+          if (order.status !== "pending") {
             throw new Error("ORDER_NOT_PENDING_PAYMENT");
           }
 
-          if (order.reservationExpiresAt <= new Date()) {
-            throw new Error("RESERVATION_EXPIRED");
-          }
+        //   if (order.reservationExpiresAt <= new Date()) {
+        //     throw new Error("RESERVATION_EXPIRED");
+        //   }
 
           const expectedAmount = Math.round(Number(order.subtotal) * 100);
 
@@ -77,7 +77,7 @@ export async function POST(request: NextRequest) {
           await tx
             .update(orders)
             .set({
-              status: "paid",
+              status: "confirmed",
               paymentStatus: "succeeded",
               updatedAt: new Date(),
             })
@@ -121,7 +121,7 @@ async function releaseReservation(orderId: string, paymentIntentId: string) {
 
     if (
       order.paymentIntentId !== paymentIntentId ||
-      order.status !== "pending_payment" ||
+      order.status !== "pending" ||
       order.paymentStatus !== "pending"
     ) {
       return;
@@ -145,14 +145,14 @@ async function releaseReservation(orderId: string, paymentIntentId: string) {
     await tx
       .update(orders)
       .set({
-        status: "payment_failed",
+        status: "pending",
         paymentStatus: "failed",
         updatedAt: new Date(),
       })
       .where(
         and(
           eq(orders.id, orderId),
-          eq(orders.status, "pending_payment")
+          eq(orders.status, "pending")
         )
       );
   });

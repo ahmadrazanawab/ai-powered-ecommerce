@@ -17,7 +17,7 @@ export async function POST(request: NextRequest) {
     .from(orders)
     .where(
       and(
-        eq(orders.status, "pending_payment"),
+        eq(orders.status, "pending"),
         lt(orders.reservationExpiresAt, new Date())
       )
     )

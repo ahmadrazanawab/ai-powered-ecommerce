@@ -10,7 +10,8 @@ import {
     index,
     unique,
     check,
-    jsonb
+    jsonb,
+    boolean
 } from "drizzle-orm/pg-core";
 import { sql } from "drizzle-orm";
 import { users } from "./users";
@@ -103,7 +104,7 @@ export const orders = pgTable(
         paymentMethod: paymentMethodEnum("payment_method")
             .notNull()
             .default("cod"),
-        
+
         createdAt: timestamp("created_at", {
             withTimezone: true,
             mode: "date",
@@ -145,6 +146,9 @@ export const orderItems = pgTable(
         }).notNull(),
         fulfillmentStatus: vendorFulfillmentStatusEnum("fulfillment_status")
             .notNull().default("pending"),
+
+        stockRestored: boolean("stock_restored").notNull().default(false),
+        
         createdAt: timestamp("created_at", {
             withTimezone: true,
             mode: "date",
