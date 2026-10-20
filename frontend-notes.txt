@@ -1,0 +1,274 @@
+Your frontend development roadmap
+
+Task 1 — Frontend setup and architecture
+Priority 1
+Goal: Prepare the frontend foundation before building pages.
+- Configure Tailwind CSS and shadcn/ui.
+- Set up the App Router folder structure.
+- Create shared layouts, navbar, footer, buttons, and form components.
+- Configure API communication with your existing backend.
+- Set up TanStack Query and environment variables.
+- Establish loading, error, and reusable notification patterns.
+Completion criteria: The application runs correctly, reusable layouts work, 
+and the frontend can successfully call a test backend endpoint.
+
+
+
+
+Task 2 — Customer storefront and product browsing
+Priority 1
+Goal: Allow customers to discover products.
+- Home page and featured products.
+- Product listing page.
+- Product cards with price and availability.
+- Search, category filters, sorting, and pagination.
+- Product details page with vendor-specific offers.
+- Responsive desktop and mobile layouts.
+Backend APIs: GET /api/products, GET /api/products/[productId], 
+and your category endpoints.
+
+Completion criteria: Products and offers come from the backend, 
+and inactive products or ineligible vendors are not shown as purchasable.
+
+
+
+
+Task 3 — Customer authentication and profile
+Priority 1
+Goal: Connect your existing customer OTP authentication flow.
+- OTP request and verification screens.
+- Signup/login flow.
+- Profile completion.
+- Account details and shipping addresses.
+- Session persistence and logout.
+- Protected customer pages.
+Backend APIs: Your existing user OTP, profile, and address endpoints.
+
+Completion criteria: Customers can log in, complete their profile, 
+refresh the page without losing a valid session, and log out correctly. Use your existing HTTP-only cookie session rather than storing authentication tokens in local storage.
+
+
+
+
+Task 4 — Cart and checkout frontend
+Priority 1
+Goal: Enable customers to purchase products.
+- Add a specific vendor offer to the cart.
+- View cart items and update quantities.
+- Remove items and show unavailable listings.
+- Display shipping address and order summary.
+- Connect checkout and payment initiation.
+- Display success, pending, and failure states.
+Backend APIs: Cart, order creation, and payment APIs.
+
+Completion criteria: Cart items reference the correct vendor listing, and checkout uses server-calculated prices and stock rather than trusting frontend values.
+
+
+
+
+Task 5 — Customer orders and order tracking
+Priority 2
+Goal: Let customers manage purchases after checkout.
+- Order history.
+- Order details and item-level vendor information.
+- Payment status and delivery status.
+- Cancellation when permitted.
+- Refund status where supported.
+Backend APIs: Customer order listing, order details, cancellation, 
+and payment status endpoints.
+
+Completion criteria: Customers can see only their own orders and 
+accurate status information.
+
+
+
+
+Task 6 — Vendor dashboard
+Priority 2
+Goal: Give vendors the tools to operate their stores.
+- Vendor login and account status.
+- Dashboard overview.
+- Create and manage vendor product listings.
+- Set listing prices and stock.
+- View vendor-specific orders.
+- Fulfill order items and update permitted statuses.
+Backend APIs: Vendor authentication, vendor product, inventory, 
+and order management APIs.
+
+Completion criteria: Vendors can manage only their own listings 
+and order items. Pending, rejected, and suspended vendors see 
+appropriate access restrictions.
+
+
+
+
+Task 7 — Admin dashboard
+Priority 2
+Goal: Build the platform management interface.
+- Admin login and protected routes.
+- Dashboard statistics.
+- Vendor approval and rejection.
+- Vendor suspension and reactivation.
+- Catalog and category management.
+- Order monitoring and management.
+Backend APIs: Existing admin authentication, vendor approval, 
+product/category, and order APIs.
+
+Completion criteria: Admin permissions match your backend rules, 
+and the interface never assumes that hiding a button is sufficient 
+authorization.
+
+
+
+
+Task 8 — Frontend integration and testing
+Required before production
+Goal: Verify the entire application end to end.
+- Test every page against real backend APIs.
+- Test expired sessions and unauthorized requests.
+- Test API failures, loading states, and empty results.
+- Test mobile responsiveness and form errors.
+- Test cart updates, checkout, and payment failures.
+- Add the remaining Zod validation to cart, order, and payment APIs.
+- Run regression tests for admin, vendor, and customer permissions.
+Completion criteria: All critical customer, vendor, and admin 
+workflows work correctly, and security checks pass.
+
+
+
+
+Task 9 — Docker and deployment
+Final phase
+Goal: Prepare a reproducible deployment.
+- Configure Docker and Docker Compose if appropriate.
+- Set up production environment variables and database migrations.
+- Build and test the production application.
+- Configure HTTPS, logging, and database backups.
+- Verify payment webhooks and production security.
+Completion criteria: The application builds, starts, 
+connects to the database, and operates correctly in the deployment environment.
+
+
+app/
+├── (store)/
+│   ├── page.tsx
+│   ├── products/
+│   │   ├── page.tsx
+│   │   └── [productId]/page.tsx
+│   ├── cart/page.tsx
+│   └── checkout/page.tsx
+├── (auth)/
+│   └── login/page.tsx
+├── account/
+│   ├── profile/page.tsx
+│   └── orders/page.tsx
+├── vendor/
+│   ├── dashboard/page.tsx
+│   ├── products/page.tsx
+│   └── orders/page.tsx
+├── admin/
+│   ├── dashboard/page.tsx
+│   ├── vendors/page.tsx
+│   └── orders/page.tsx
+components/
+├── ui/
+├── layout/
+└── products/
+lib/
+├── api-client.ts
+├── utils.ts
+└── validations/
+providers/
+└── query-provider.tsx
+
+
+2. Frontend libraries and their purposes
+
+1. Tailwind CSS
+Essential
+Style pages, product cards, dashboards, forms, and responsive 
+layouts without writing a separate CSS class for every component.
+
+
+
+2. shadcn/ui
+Prebuilt, customizable UI components: dialogs, dropdowns, 
+tables, buttons, inputs, and sheets. Useful for admin and 
+vendor dashboards as well as storefront interactions.
+
+
+
+3. TanStack Query
+Fetch and cache backend data, handle loading and errors, 
+refresh product lists after mutations, and manage server 
+data such as orders and inventory.
+
+
+
+4. Redux Toolkit
+Manage complex shared client state when necessary. 
+You can add it later for complex checkout steps or shared UI 
+state. It is not mandatory, and your API-backed cart may work 
+perfectly well without it.
+
+
+
+5. React Hook Form
+Manage forms efficiently, including customer profiles, 
+shipping addresses, product forms, vendor forms, and login screens.
+
+
+
+6. Zod
+Validate frontend form input and infer TypeScript types. 
+You already use Zod on your backend; you can reuse 
+compatible schemas where appropriate. Backend validation remains necessary.
+
+
+
+7. Lucide
+Add consistent icons for the cart, search, profile, 
+dashboard navigation, orders, and actions.
+
+
+8. Sonner
+Display notifications such as “Added to cart,” “Product updated,” 
+“Order placed,” or “Payment failed.”
+
+
+
+9. Recharts
+Create dashboard charts for sales, orders, revenue, 
+and product performance. Use it when your dashboard analytics are ready.
+
+
+
+3. Additional skills you will need
+Skill	                                            Purpose
+Fetch API	                                        Communicate with your existing backend endpoints
+HTTP and REST APIs	                                Understand methods, headers, status codes, and JSON responses
+Cookies and sessions	                            Work with your existing HTTP-only authentication cookies
+Server vs. Client Components	                    Decide which parts should render on the server and which require browser interaction
+React Context	                                    Share small amounts of application-wide state, such as theme or lightweight UI preferences
+Next.js middleware / route protection concepts	    Understand navigation and access control; enforce authorization on the backend too
+Error and loading handling	                        Show helpful feedback when APIs fail or data is loading
+Accessibility	                                    Build usable forms, dialogs, navigation, and keyboard interactions
+Git and GitHub	                                    Track changes and protect your working backend while developing the frontend
+
+
+
+4. Which skills should you use for each frontend feature?
+Feature	                                        Recommended tools
+Customer storefront	                            Next.js, Tailwind CSS, shadcn/ui
+Product listing, search, and filtering	        TanStack Query, Fetch API
+Product details and vendor offers	            Next.js, TanStack Query
+OTP login and profile forms	                    React Hook Form, Zod
+Cart	                                        TanStack Query + backend cart APIs
+Checkout and shipping address	                React Hook Form, Zod, TanStack Query
+Payment UI	                                    Fetch API, TanStack Query, payment provider's frontend SDK if required
+Customer order history	                        TanStack Query
+Vendor dashboard	                            Next.js, shadcn/ui, TanStack Query
+Admin dashboard	                                Next.js, shadcn/ui, TanStack Query
+Dashboard charts	                            Recharts
+Notifications	                                Sonner
+Complex shared client state	                    Redux Toolkit, if needed
