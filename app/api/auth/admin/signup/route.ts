@@ -3,7 +3,7 @@ import bcrypt from "bcryptjs";
 import { eq } from "drizzle-orm";
 
 import { db } from "@/app/api/lib/db";
-import { adminAccounts } from "@/app/api/lib/schema/singup";
+import { adminAccounts } from "@/app/api/lib/schema/admin-schema";
 
 import { adminSignupSchema } from "@/app/api/lib/validations/admins/signup";
 

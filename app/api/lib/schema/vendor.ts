@@ -8,7 +8,7 @@ import {
     boolean,
 } from "drizzle-orm/pg-core";
 
-import { adminAccounts } from "./admin";
+import { adminAccounts } from "./admin-schema";
 
 export const vendorStatusEnum = pgEnum("vendor_status", [
     "pending",

@@ -1,5 +1,4 @@
-// db/schema/signup.ts
-
+// db/admin-schema/signup.ts
 import {
     pgTable,
     uuid,

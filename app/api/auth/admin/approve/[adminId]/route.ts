@@ -3,7 +3,7 @@ import { jwtVerify } from "jose";
 import { eq, and } from "drizzle-orm";
 
 import { db } from "@/app/api/lib/db";
-import { adminAccounts } from "@/app/api/lib/schema/singup";
+import { adminAccounts } from "@/app/api/lib/schema/admin-schema";
 
 type AdminJwtPayload = {
     adminId: string;

@@ -6,7 +6,7 @@ import { eq } from "drizzle-orm";
 import { SignJWT } from "jose";
 
 import { db } from "@/app/api/lib/db";
-import { adminAccounts } from "@/app/api/lib/schema/admin";
+import { adminAccounts } from "@/app/api/lib/schema/admin-schema";
 
 import { adminLoginSchema } from "@/app/api/lib/validations/admin";
 
