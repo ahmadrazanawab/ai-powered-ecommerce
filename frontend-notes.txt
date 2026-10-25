@@ -272,3 +272,80 @@ Admin dashboard	                                Next.js, shadcn/ui, TanStack Que
 Dashboard charts	                            Recharts
 Notifications	                                Sonner
 Complex shared client state	                    Redux Toolkit, if needed
+
+
+project-root/
+├── middleware.ts                      # protects /admin-dashboard/* (role + token check)
+├── drizzle.config.ts
+│
+├── db/
+│   ├── index.ts                       # Drizzle + PostgreSQL connection
+│   ├── schema/
+│   │   ├── admins.ts                  # id, name, email, phone, password, role, status, isActive...
+│   │   ├── vendors.ts
+│   │   ├── users.ts                   # customers
+│   │   ├── audit-logs.ts              # who approved/rejected/suspended whom, and why
+│   │   └── index.ts
+│   └── migrations/
+│
+├── app/
+│   ├── lib/
+│   │   ├── axios.ts                   # (exists)
+│   │   └── query-provider.tsx         # React Query provider
+│   │
+│   ├── (admin)/
+│   │   ├── admin/                     # public admin pages (no sidebar)
+│   │   │   ├── login/page.tsx         # (done)
+│   │   │   ├── signup/page.tsx        # (done)
+│   │   │   └── pending-approval/page.tsx   # (done)
+│   │   │
+│   │   └── admin-dashboard/           # protected area
+│   │       ├── layout.tsx             # sidebar + topbar + role guard
+│   │       ├── page.tsx               # overview: stats cards, recent activity
+│   │       ├── approve/page.tsx       # admin approval (super_admin only) (done)
+│   │       ├── vendors/
+│   │       │   ├── page.tsx           # vendor list + approve/reject/suspend
+│   │       │   └── [vendorId]/page.tsx
+│   │       ├── users/
+│   │       │   ├── page.tsx           # customer list + block/unblock
+│   │       │   └── [userId]/page.tsx
+│   │       ├── audit-logs/page.tsx    # super_admin only
+│   │       ├── profile/page.tsx       # change name, phone, password
+│   │       └── settings/page.tsx      # later
+│   │
+│   ├── components/admin/
+│   │   ├── Sidebar.tsx
+│   │   ├── Topbar.tsx
+│   │   ├── StatCard.tsx
+│   │   ├── StatusBadge.tsx            # pending / approved / rejected / suspended
+│   │   ├── DataTable.tsx              # reusable table with search + pagination
+│   │   ├── ConfirmDialog.tsx          # replaces window.confirm
+│   │   └── ReasonModal.tsx            # reject/suspend reason input
+│   │
+│   └── api/
+│       ├── lib/
+│       │   ├── validations/
+│       │   │   ├── admin.ts           # login schema (exists)
+│       │   │   └── admins/signup.ts   # signup schema (exists)
+│       │   ├── auth/
+│       │   │   ├── jwt.ts             # sign / verify token
+│       │   │   ├── password.ts        # hash / compare
+│       │   │   └── require-role.ts    # guard: requireAdmin, requireSuperAdmin
+│       │   └── responses.ts           # consistent success/error JSON
+│       │
+│       ├── auth/admin/
+│       │   ├── signup/route.ts        # (done)
+│       │   ├── login/route.ts         # (done)
+│       │   ├── logout/route.ts
+│       │   ├── me/route.ts            # current admin details
+│       │   └── approve/
+│       │       ├── route.ts           # GET admins list (done)
+│       │       └── [adminId]/route.ts # PATCH approve/reject/suspend/reactivate (done)
+│       │
+│       └── admin/
+│           ├── dashboard/stats/route.ts
+│           ├── vendors/route.ts               # GET list
+│           ├── vendors/[vendorId]/route.ts    # GET one, PATCH action
+│           ├── users/route.ts
+│           ├── users/[userId]/route.ts
+│           └── audit-logs/route.ts

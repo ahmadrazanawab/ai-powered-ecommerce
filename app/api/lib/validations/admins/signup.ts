@@ -34,3 +34,6 @@ export const adminSignupSchema = z
     message: "Passwords do not match",
     path: ["confirmPassword"],
   });
+
+
+export type AdminSignupI = z.infer<typeof adminSignupSchema>;
