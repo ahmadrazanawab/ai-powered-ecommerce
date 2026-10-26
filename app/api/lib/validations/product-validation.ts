@@ -55,4 +55,4 @@ export const productValidation = z.object({
         .nullable(),
 });
 
-export type ProductValidation = z.infer<typeof productValidation>;
+export type ProductI = z.infer<typeof productValidation>;

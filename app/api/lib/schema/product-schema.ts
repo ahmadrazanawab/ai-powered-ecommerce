@@ -12,7 +12,7 @@ import {
 } from "drizzle-orm/pg-core";
 
 import { categorySchema } from "./category-schema";
-import { adminAccounts } from "./singup";
+import { adminAccounts } from "./admin-schema";
 
 
 export const productSchema = pgTable("products", {

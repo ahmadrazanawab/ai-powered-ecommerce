@@ -48,29 +48,6 @@ export async function PUT(
 
         const { name, slug, description, imageUrl } = result.data;
 
-        // const [updatedCategory] = await db
-        //     .update(categorySchema)
-        //     .set({
-        //         name,
-        //         slug,
-        //         description,
-        //         imageUrl,
-        //     })
-        //     .where(eq(categorySchema.id, categoryId))
-        //     .returning();
-
-        // if (!updatedCategory) {
-        //     return NextResponse.json(
-        //         {
-        //             success: false,
-        //             message: "Category not found",
-        //         },
-        //         { status: 404 }
-        //     );
-        // }
-
-        
-
         const [duplicate] = await db
             .select({ id: categorySchema.id })
             .from(categorySchema)
@@ -92,6 +69,20 @@ export async function PUT(
                     message: "Category name or slug already exists",
                 },
                 { status: 409 }
+            );
+        }
+
+
+        const [updatedCategory] = await db
+            .update(categorySchema)
+            .set({ name, slug, description, imageUrl, updatedAt: new Date() })
+            .where(eq(categorySchema.id, categoryId))
+            .returning();
+
+        if (!updatedCategory) {
+            return NextResponse.json(
+                { success: false, message: "Category not found" },
+                { status: 404 }
             );
         }
 

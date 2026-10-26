@@ -26,8 +26,10 @@ export const categoryValidation = z.object({
     imageUrl: z
         .string()
         .trim()
+        .url("Please provide a valid image URL")
         .optional()
         .or(z.literal("")),
 });
 
-//   .url("Please provide a valid image URL")
+
+export type CategoryFormI = z.infer<typeof categoryValidation>;

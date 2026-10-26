@@ -1,6 +1,6 @@
 
 import { pgTable, uuid, varchar, text, boolean, timestamp } from "drizzle-orm/pg-core";
-import { adminAccounts } from "./singup";
+import { adminAccounts } from "./admin-schema";
 
 export const categorySchema = pgTable("categories", {
     id: uuid("id").defaultRandom().primaryKey(),
