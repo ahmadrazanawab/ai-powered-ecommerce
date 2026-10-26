@@ -12,6 +12,9 @@ import {
     type AdminLoginI
 } from "@/app/api/lib/validations/admin";
 
+import { useRouter } from 'next/navigation'; 
+
+
 /* ---------- inline icons (no extra dependency) ---------- */
 const svgBase = {
     xmlns: "http://www.w3.org/2000/svg",
@@ -52,7 +55,7 @@ const ShieldIcon = () => (
 const Page = () => {
     // UI-only state: toggles password visibility
     const [showPassword, setShowPassword] = useState(false);
-
+    const router = useRouter();
     const {
         register,
         handleSubmit,
@@ -83,6 +86,7 @@ const Page = () => {
             localStorage.setItem("admin_id", admin.id);
 
             console.log("Admin token saved");
+            router.push('/admin-dashboard'); 
             return res.data;
         },
 

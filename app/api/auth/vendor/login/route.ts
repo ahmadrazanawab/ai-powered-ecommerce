@@ -126,7 +126,8 @@ export async function POST(req: NextRequest) {
                 vendor: {
                     vendorId: vendor.id,
                     email: vendor.email,
-                    isActive: vendor.isActive
+                    isActive: vendor.isActive,
+                    token
                 }
             },
             { status: 201 }

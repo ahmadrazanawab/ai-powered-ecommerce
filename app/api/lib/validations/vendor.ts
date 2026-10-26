@@ -40,7 +40,9 @@ export const vendorSignupSchema = z
             message: "Passwords do not match",
             path: ["confirmPassword"],
         }
-    );
+);
+    
+export type VendorSignupI = z.infer<typeof vendorSignupSchema>;
 
 export const vendorLoginSchema = z
     .object({
@@ -57,6 +59,8 @@ export const vendorLoginSchema = z
             .max(100, "Password cannot exceed 100 characters"),
     })
     .strict();
+
+export type VendorLoginI = z.infer<typeof vendorLoginSchema>;
 
 export const vendorProfileSchema = z
     .object({
@@ -86,3 +90,6 @@ export const vendorProfileSchema = z
             .optional(),
     })
     .strict();
+
+
+export type VendorProfileI = z.infer<typeof vendorProfileSchema>;
