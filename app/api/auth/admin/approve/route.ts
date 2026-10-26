@@ -99,7 +99,7 @@ export async function GET(request: NextRequest) {
 
         return NextResponse.json({
             success: true,
-            message: "Pending admins fetched successfully",
+            message: "All admins fetched successfully",
             adminDetails: getAdminDetails,
         });
     } catch (error) {

@@ -179,6 +179,12 @@ export default function AdminDashboardPage() {
                             Review pending admins
                         </Link>
                     )}
+                    <Link
+                        href="/admin-dashboard/vendors"
+                        className="md:mx-2 btn mt-6 h-11 rounded-xl border-0 bg-white px-5 font-medium text-slate-900 hover:bg-slate-100"
+                    >
+                        Review pending vendors
+                    </Link>
                 </div>
             </section>
 

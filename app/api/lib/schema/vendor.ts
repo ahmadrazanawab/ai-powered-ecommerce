@@ -51,6 +51,8 @@ export const vendors = pgTable("vendors", {
         .notNull()
         .default(false),
 
+    statusReason: text("rejection_reason"),
+
     approvedAt: timestamp("approved_at", {
         withTimezone: true,
     }),
