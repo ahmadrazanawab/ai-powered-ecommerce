@@ -270,6 +270,7 @@ export async function POST(request: NextRequest) {
                         ? "Customer signup successful"
                         : "Customer login successful",
                 user,
+                token
             },
             { status: 200 }
         );

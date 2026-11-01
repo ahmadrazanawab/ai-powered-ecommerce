@@ -66,7 +66,7 @@ export async function GET(req: NextRequest) {
             message: "Products fetched successfully",
             data,
             pagination: { page, limit, total, totalPages: Math.ceil(total / limit) },
-        });
+        },{status:200});
     } catch (error) {
         console.error("ADMIN_LIST_PRODUCTS_ERROR:", error);
         return NextResponse.json(
