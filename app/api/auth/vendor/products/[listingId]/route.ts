@@ -228,3 +228,110 @@ export async function PUT(
         );
     }
 }
+
+
+
+// ADD THIS to the same file as your PUT:
+// app/api/auth/vendor/products/[listingId]/route.ts
+const UUID_REGEX =
+    /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+export async function DELETE(
+    req: NextRequest,
+    context: RouteContext
+) {
+    try {
+        // 1. Authenticate vendor
+        const auth = await verifyVendorToken(req);
+
+        if (!auth.success) {
+            return auth.response;
+        }
+
+        const vendorId = auth.payload.vendorId;
+        const { listingId } = await context.params;
+
+        // 2. Validate listing ID format
+        if (!UUID_REGEX.test(listingId)) {
+            return NextResponse.json(
+                { success: false, message: "Invalid listing ID" },
+                { status: 400 }
+            );
+        }
+
+        // 3. Confirm vendor is approved and active
+        const [vendor] = await db
+            .select({ id: vendors.id })
+            .from(vendors)
+            .where(
+                and(
+                    eq(vendors.id, vendorId),
+                    eq(vendors.status, "approved"),
+                    eq(vendors.isActive, true)
+                )
+            )
+            .limit(1);
+
+        if (!vendor) {
+            return NextResponse.json(
+                {
+                    success: false,
+                    message: "Your vendor account is not approved or active",
+                },
+                { status: 403 }
+            );
+        }
+
+        // 4. Delete only a listing owned by this vendor
+        const [deletedListing] = await db
+            .delete(vendorProductSchema)
+            .where(
+                and(
+                    eq(vendorProductSchema.id, listingId),
+                    eq(vendorProductSchema.vendorId, vendorId)
+                )
+            )
+            .returning({ id: vendorProductSchema.id });
+
+        if (!deletedListing) {
+            return NextResponse.json(
+                { success: false, message: "Listing not found" },
+                { status: 404 }
+            );
+        }
+
+        return NextResponse.json(
+            {
+                success: true,
+                message: "Listing deleted successfully",
+                data: { listingId: deletedListing.id },
+            },
+            { status: 200 }
+        );
+    } catch (error) {
+        // 23503 = Postgres foreign key violation (the listing is used by orders or cart items)
+        const err = error as { code?: string; cause?: { code?: string } };
+        const code = err?.code ?? err?.cause?.code;
+
+        if (code === "23503") {
+            return NextResponse.json(
+                {
+                    success: false,
+                    message:
+                        "This listing is linked to existing orders and cannot be deleted. Hide it instead.",
+                },
+                { status: 409 }
+            );
+        }
+
+        console.error("DELETE_VENDOR_PRODUCT_ERROR:", error);
+
+        return NextResponse.json(
+            {
+                success: false,
+                message: "Failed to delete listing",
+            },
+            { status: 500 }
+        );
+    }
+}

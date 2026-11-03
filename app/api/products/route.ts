@@ -7,6 +7,7 @@ import {
     desc,
     ilike,
     or,
+    inArray
 } from "drizzle-orm";
 
 import { db } from "../lib/db";
@@ -149,19 +150,16 @@ export async function POST(req: NextRequest) {
 
 
 
-
-
-
-
+// GET: Show admin products AND vendor listings to customers
 export async function GET(request: NextRequest) {
     try {
         const { searchParams } = new URL(request.url);
 
-        // Search and filters
+        // 1. Search and filters
         const search = searchParams.get("search")?.trim();
         const categoryId = searchParams.get("categoryId");
 
-        // Pagination
+        // 2. Pagination
         const page = Math.max(
             1,
             Number.parseInt(searchParams.get("page") || "1", 10) || 1
@@ -177,7 +175,7 @@ export async function GET(request: NextRequest) {
 
         const offset = (page - 1) * limit;
 
-        // Sorting
+        // 3. Sorting
         const sortBy = searchParams.get("sortBy") || "newest";
         const sortOrder = searchParams.get("sortOrder") || "desc";
 
@@ -194,13 +192,9 @@ export async function GET(request: NextRequest) {
             );
         }
 
-        // Customer visibility rules
-        const conditions = [
-            eq(productSchema.isActive, true),
-            eq(vendorProductSchema.isActive, true),
-            eq(vendors.status, "approved"),
-            eq(vendors.isActive, true),
-        ];
+        // 4. Customer visibility conditions
+        // Every active admin product is visible to customers.
+        const conditions = [eq(productSchema.isActive, true)];
 
         if (categoryId) {
             conditions.push(eq(productSchema.categoryId, categoryId));
@@ -221,42 +215,31 @@ export async function GET(request: NextRequest) {
 
         const whereCondition = and(...conditions);
 
-        // Total number of eligible offers matching the filters
+        // 5. Count active admin products
         const [totalResult] = await db
-            .select({ total: count() })
-            .from(vendorProductSchema)
-            .innerJoin(
-                productSchema,
-                eq(vendorProductSchema.productId, productSchema.id)
-            )
-            .innerJoin(
-                vendors,
-                eq(vendorProductSchema.vendorId, vendors.id)
-            )
+            .select({
+                total: count(),
+            })
+            .from(productSchema)
             .innerJoin(
                 categorySchema,
                 eq(productSchema.categoryId, categorySchema.id)
             )
             .where(whereCondition);
 
-        // Sorting uses the vendor's offer price, not the catalog price
+        // 6. Sorting
+        const direction = sortOrder === "asc" ? asc : desc;
+
         const orderBy =
             sortBy === "name"
-                ? sortOrder === "asc"
-                    ? asc(productSchema.name)
-                    : desc(productSchema.name)
+                ? direction(productSchema.name)
                 : sortBy === "price"
-                    ? sortOrder === "asc"
-                        ? asc(vendorProductSchema.price)
-                        : desc(vendorProductSchema.price)
-                    : sortOrder === "asc"
-                        ? asc(productSchema.createdAt)
-                        : desc(productSchema.createdAt);
+                    ? direction(productSchema.price)
+                    : direction(productSchema.createdAt);
 
-        // Fetch offers available to customers
+        // 7. Fetch admin products
         const products = await db
             .select({
-                listingId: vendorProductSchema.id,
                 productId: productSchema.id,
                 name: productSchema.name,
                 slug: productSchema.slug,
@@ -264,38 +247,94 @@ export async function GET(request: NextRequest) {
                 imageUrl: productSchema.imageUrl,
                 categoryId: categorySchema.id,
                 categoryName: categorySchema.name,
-
-                // Vendor-specific values
-                price: vendorProductSchema.price,
-                stock: vendorProductSchema.stock,
-                vendorId: vendors.id,
-                vendorName: vendors.name,
+                price: productSchema.price,
+                stock: productSchema.stock,
+                createdAt: productSchema.createdAt,
             })
-            .from(vendorProductSchema)
-            .innerJoin(
-                productSchema,
-                eq(vendorProductSchema.productId, productSchema.id)
-            )
-            .innerJoin(
-                vendors,
-                eq(vendorProductSchema.vendorId, vendors.id)
-            )
+            .from(productSchema)
             .innerJoin(
                 categorySchema,
                 eq(productSchema.categoryId, categorySchema.id)
             )
             .where(whereCondition)
-            .orderBy(orderBy)
+            .orderBy(orderBy, asc(productSchema.id))
             .limit(limit)
             .offset(offset);
 
+        // 8. Fetch approved vendor offers for these products
+        const productIds = products.map((product) => product.productId);
+
+        const offers =
+            productIds.length > 0
+                ? await db
+                    .select({
+                        listingId: vendorProductSchema.id,
+                        productId: vendorProductSchema.productId,
+                        vendorId: vendors.id,
+                        vendorName: vendors.name,
+                        price: vendorProductSchema.price,
+                        stock: vendorProductSchema.stock,
+                    })
+                    .from(vendorProductSchema)
+                    .innerJoin(
+                        vendors,
+                        eq(vendorProductSchema.vendorId, vendors.id)
+                    )
+                    .where(
+                        and(
+                            inArray(vendorProductSchema.productId, productIds),
+                            eq(vendorProductSchema.isActive, true),
+                            eq(vendors.status, "approved"),
+                            eq(vendors.isActive, true)
+                        )
+                    )
+                    .orderBy(asc(vendorProductSchema.price))
+                : [];
+
+        // 9. Group vendor offers by product
+        const offersMap = new Map<string, typeof offers>();
+
+        for (const offer of offers) {
+            const existing = offersMap.get(offer.productId) || [];
+            existing.push(offer);
+            offersMap.set(offer.productId, existing);
+        }
+
+        // 10. Return the admin product AND its vendor listings
+        const customerProducts = products.flatMap((product) => {
+            const productOffers = offersMap.get(product.productId) || [];
+
+            // Admin product is always shown
+            const adminItem = {
+                ...product,
+                listingId: null,
+                vendorId: null,
+                vendorName: null,
+                source: "admin" as const,
+            };
+
+            // Vendor listings of the same product
+            const vendorItems = productOffers.map((offer) => ({
+                ...product,
+                listingId: offer.listingId,
+                price: offer.price,
+                stock: offer.stock,
+                vendorId: offer.vendorId,
+                vendorName: offer.vendorName,
+                source: "vendor" as const,
+            }));
+
+            return [adminItem, ...vendorItems];
+        });
+
         const total = Number(totalResult?.total ?? 0);
 
+        // 11. Response
         return NextResponse.json(
             {
                 success: true,
                 message: "Products fetched successfully",
-                data: products,
+                data: customerProducts,
                 pagination: {
                     page,
                     limit,
@@ -317,3 +356,175 @@ export async function GET(request: NextRequest) {
         );
     }
 }
+
+
+
+
+
+
+
+
+// export async function GET(request: NextRequest) {
+//     try {
+//         const { searchParams } = new URL(request.url);
+
+//         // Search and filters
+//         const search = searchParams.get("search")?.trim();
+//         const categoryId = searchParams.get("categoryId");
+
+//         // Pagination
+//         const page = Math.max(
+//             1,
+//             Number.parseInt(searchParams.get("page") || "1", 10) || 1
+//         );
+
+//         const limit = Math.min(
+//             100,
+//             Math.max(
+//                 1,
+//                 Number.parseInt(searchParams.get("limit") || "12", 10) || 12
+//             )
+//         );
+
+//         const offset = (page - 1) * limit;
+
+//         // Sorting
+//         const sortBy = searchParams.get("sortBy") || "newest";
+//         const sortOrder = searchParams.get("sortOrder") || "desc";
+
+//         if (
+//             !["name", "price", "newest"].includes(sortBy) ||
+//             !["asc", "desc"].includes(sortOrder)
+//         ) {
+//             return NextResponse.json(
+//                 {
+//                     success: false,
+//                     message: "Invalid sorting parameters",
+//                 },
+//                 { status: 400 }
+//             );
+//         }
+
+//         // Customer visibility rules
+//         const conditions = [
+//             eq(productSchema.isActive, true),
+//             eq(vendorProductSchema.isActive, true),
+//             eq(vendors.status, "approved"),
+//             eq(vendors.isActive, true),
+//         ];
+
+//         if (categoryId) {
+//             conditions.push(eq(productSchema.categoryId, categoryId));
+//         }
+
+//         if (search) {
+//             const searchPattern = `%${search}%`;
+
+//             conditions.push(
+//                 or(
+//                     ilike(productSchema.name, searchPattern),
+//                     ilike(productSchema.slug, searchPattern),
+//                     ilike(productSchema.description, searchPattern),
+//                     ilike(categorySchema.name, searchPattern)
+//                 )!
+//             );
+//         }
+
+//         const whereCondition = and(...conditions);
+
+//         // Total number of eligible offers matching the filters
+//         const [totalResult] = await db
+//             .select({ total: count() })
+//             .from(vendorProductSchema)
+//             .innerJoin(
+//                 productSchema,
+//                 eq(vendorProductSchema.productId, productSchema.id)
+//             )
+//             .innerJoin(
+//                 vendors,
+//                 eq(vendorProductSchema.vendorId, vendors.id)
+//             )
+//             .innerJoin(
+//                 categorySchema,
+//                 eq(productSchema.categoryId, categorySchema.id)
+//             )
+//             .where(whereCondition);
+
+//         // Sorting uses the vendor's offer price, not the catalog price
+//         const orderBy =
+//             sortBy === "name"
+//                 ? sortOrder === "asc"
+//                     ? asc(productSchema.name)
+//                     : desc(productSchema.name)
+//                 : sortBy === "price"
+//                     ? sortOrder === "asc"
+//                         ? asc(vendorProductSchema.price)
+//                         : desc(vendorProductSchema.price)
+//                     : sortOrder === "asc"
+//                         ? asc(productSchema.createdAt)
+//                         : desc(productSchema.createdAt);
+
+//         // Fetch offers available to customers
+//         const products = await db
+//             .select({
+//                 listingId: vendorProductSchema.id,
+//                 productId: productSchema.id,
+//                 name: productSchema.name,
+//                 slug: productSchema.slug,
+//                 description: productSchema.description,
+//                 imageUrl: productSchema.imageUrl,
+//                 categoryId: categorySchema.id,
+//                 categoryName: categorySchema.name,
+
+//                 // Vendor-specific values
+//                 price: vendorProductSchema.price,
+//                 stock: vendorProductSchema.stock,
+//                 vendorId: vendors.id,
+//                 vendorName: vendors.name,
+//             })
+//             .from(vendorProductSchema)
+//             .innerJoin(
+//                 productSchema,
+//                 eq(vendorProductSchema.productId, productSchema.id)
+//             )
+//             .innerJoin(
+//                 vendors,
+//                 eq(vendorProductSchema.vendorId, vendors.id)
+//             )
+//             .innerJoin(
+//                 categorySchema,
+//                 eq(productSchema.categoryId, categorySchema.id)
+//             )
+//             .where(whereCondition)
+//             .orderBy(orderBy)
+//             .limit(limit)
+//             .offset(offset);
+
+//         const total = Number(totalResult?.total ?? 0);
+
+//         return NextResponse.json(
+//             {
+//                 success: true,
+//                 message: "Products fetched successfully",
+//                 data: products,
+//                 pagination: {
+//                     page,
+//                     limit,
+//                     total,
+//                     totalPages: Math.ceil(total / limit),
+//                 },
+//             },
+//             { status: 200 }
+//         );
+//     } catch (error) {
+//         console.error("GET_CUSTOMER_PRODUCTS_ERROR:", error);
+
+//         return NextResponse.json(
+//             {
+//                 success: false,
+//                 message: "Failed to fetch products",
+//             },
+//             { status: 500 }
+//         );
+//     }
+// }

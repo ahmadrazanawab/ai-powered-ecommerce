@@ -13,6 +13,16 @@ import {
     type VendorLoginI,
 } from "@/app/api/lib/validations/vendor";
 
+/*
+message: "Vendor authentication successful!"
+success: true
+vendor: 
+    email: "ahil@gmail.com"
+    isActive: true
+    token: "eyJhbGciOiJIUzI1NiJ9.eyJ2ZW5kb3JJZCI6ImM2MmVjMDdkLWMwMGEtNDliZS05ZTQwLTg4ZTgzODYxZWVkMCIsImVtYWlsIjoiYWhpbEBnbWFpbC5jb20iLCJpc0FjdGl2ZSI6dHJ1ZSwiaWF0IjoxNzkzNjI4NTE2LCJleHAiOjE3OTM3MTQ5MTZ9.yQTdsm1j1WupMVPBu-xQkqOR1A3ISmBehOauxwss-fM"
+    vendorId: "c62ec07d-c00a-49be-9e40-88e83861eed0"
+*/ 
+
 /* ---------- inline icons (no extra dependency) ---------- */
 const svgBase = {
     xmlns: "http://www.w3.org/2000/svg",
@@ -80,7 +90,8 @@ const Page = () => {
             localStorage.setItem("vendor_token", vendor.token);
             localStorage.setItem("vendor_id", vendor.vendorId);
             localStorage.setItem("vendor_email", vendor.email);
-
+            localStorage.setItem("isActive_vendor", vendor.isActive);
+            
             console.log("Vendor token saved");
             router.push("/vendor-dashboard")
             return res.data;
