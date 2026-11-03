@@ -1,3 +1,4 @@
+
 "use client";
 
 import { useEffect, useRef, useState, type ReactNode } from "react";
@@ -5,6 +6,7 @@ import Link from "next/link";
 import { keepPreviousData, useQuery } from "@tanstack/react-query";
 import { useForm } from "react-hook-form";
 import { api } from "@/app/lib/axios";
+import { RelatedProducts } from "../components/RelatedProducts";
 
 /* ---------- edit these to match your store ---------- */
 const BRAND = "Aurelia";
@@ -169,12 +171,16 @@ function ProductCard({ product }: { product: ProductI }) {
     const lowStock = !outOfStock && product.stock <= LOW_STOCK_AT;
     const seller = product.vendorName ?? `${BRAND} Official`;
 
+    // keep the selected seller when opening the product page
+    const href = product.listingId
+        ? `/user/shop/${product.slug}?listing=${encodeURIComponent(product.listingId)}`
+        : `/user/shop/${product.slug}?source=admin`;
     return (
         <article
             className={`${cardCls} group flex flex-col overflow-hidden transition-all duration-300 hover:-translate-y-1 hover:shadow-[0_28px_70px_-20px_rgba(15,23,42,0.3)]`}
         >
             <Link
-                href={`/user/shop/${product.slug}`}
+                href={href}
                 className="relative block aspect-square overflow-hidden focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-amber-400"
             >
                 <div className={`absolute inset-0 bg-gradient-to-br ${toneFor(product.productId)}`}>
@@ -225,7 +231,8 @@ function ProductCard({ product }: { product: ProductI }) {
 
                 <h3 className="mt-1.5 line-clamp-1 text-sm font-semibold text-slate-900 sm:text-base">
                     <Link
-                        href={`/user/products/${product.slug}`}
+                        // href={`/user/shop/${product.slug}`}
+                        href={href}
                         className="hover:underline focus-visible:outline-none focus-visible:underline"
                     >
                         {product.name}
@@ -258,6 +265,7 @@ function ProductCard({ product }: { product: ProductI }) {
                     </button>
                 </div>
             </div>
+
         </article>
     );
 }
@@ -319,8 +327,8 @@ function Pagination({
                         onClick={() => onChange(p)}
                         aria-current={p === page ? "page" : undefined}
                         className={`${base} ${p === page
-                                ? "bg-slate-950 text-amber-300 ring-slate-950"
-                                : "bg-white text-slate-700 ring-slate-200 hover:bg-slate-50"
+                            ? "bg-slate-950 text-amber-300 ring-slate-950"
+                            : "bg-white text-slate-700 ring-slate-200 hover:bg-slate-50"
                             }`}
                     >
                         {p}
@@ -524,8 +532,8 @@ export default function ShopPage() {
                                     aria-pressed={active}
                                     onClick={() => setValue("categoryId", c.categoryId, { shouldDirty: true })}
                                     className={`shrink-0 rounded-full px-4 py-2 text-sm font-medium transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-400 ${active
-                                            ? "bg-slate-950 text-amber-300 shadow-md shadow-slate-950/20"
-                                            : "bg-slate-100 text-slate-700 hover:bg-slate-200"
+                                        ? "bg-slate-950 text-amber-300 shadow-md shadow-slate-950/20"
+                                        : "bg-slate-100 text-slate-700 hover:bg-slate-200"
                                         }`}
                                 >
                                     {c.name}
@@ -533,6 +541,8 @@ export default function ShopPage() {
                             );
                         })}
                     </div>
+                   
+             
                 </div>
             </section>
 
@@ -640,35 +650,7 @@ export default function ShopPage() {
                     />
                 )}
             </section>
+
         </div>
     );
 }
-
-
-// "use client";
-// import React from 'react'
-
-// import { useMutation, useQuery } from '@tanstack/react-query';
-// import { api } from '@/app/lib/axios';
-
-// const page = () => {
-
-//     const { data, isPending, isError } = useQuery({
-//         queryKey: ['products'],
-//         queryFn: async () => {
-//             const res = await api.get("/api/products");
-//             return res.data;
-//         }
-//     });
-
-//     const products = Array.isArray(data?.data) ? data.data : [];
-
-//     console.log(products);
-//   return (
-//     <div>
-//       this is shop page
-//     </div>
-//   )
-// }
-
-// export default page

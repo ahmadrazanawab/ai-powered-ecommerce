@@ -1,13 +1,14 @@
-// FILE: app/user/products/[slug]/page.tsx
+// FILE: app/user/shop/[slug]/page.tsx
 "use client";
 
-import { useEffect, useMemo, type ReactNode } from "react";
+import { Suspense, useEffect, useMemo, type ReactNode } from "react";
 import Link from "next/link";
-import { useParams } from "next/navigation";
+import { useParams, useSearchParams } from "next/navigation";
 import { useQuery } from "@tanstack/react-query";
 import { useForm } from "react-hook-form";
 import { api } from "@/app/lib/axios";
 import { useAddToCart } from "@/app/hooks/use-cart";
+import { RelatedProducts } from "../../components/RelatedProducts";
 
 /* ---------- edit these to match your store ---------- */
 const BRAND = "Aurelia";
@@ -37,7 +38,6 @@ interface ProductDetailI {
 }
 
 interface PurchaseForm {
-    offerId: string; // "admin" or a vendor listingId
     quantity: number;
 }
 
@@ -127,18 +127,14 @@ function formatPrice(value: string | number) {
     })}`;
 }
 
-/* ---------- page ---------- */
-export default function ProductDetailPage() {
+/* ---------- page content ---------- */
+function ProductDetailContent() {
     // dynamic segment: the folder name [slug] becomes params.slug
     const { slug } = useParams<{ slug: string }>();
+    const searchParams = useSearchParams();
+    const listingParam = searchParams.get("listing"); // null = admin item
 
-    const {
-        data,
-        isPending,
-        isError,
-        error,
-        refetch,
-    } = useQuery({
+    const { data, isPending, isError, error, refetch } = useQuery({
         queryKey: ["product", slug],
         queryFn: async () => (await api.get(`/api/products/product_details/${slug}`)).data,
         enabled: Boolean(slug),
@@ -148,26 +144,36 @@ export default function ProductDetailPage() {
     const product: ProductDetailI | undefined = data?.data;
     const notFound = (error as HttpErrorLike | null)?.response?.status === 404;
 
-    /* every way to buy this product: the admin item + each vendor offer */
+    /* only the seller the user clicked on (admin item if no listing in the URL) */
     const options = useMemo(() => {
         if (!product) return [];
-        return [
-            {
-                id: "admin",
-                listingId: null as string | null,
-                label: `${BRAND} Official`,
-                price: product.price,
-                stock: product.stock,
-            },
-            ...product.offers.map((o) => ({
-                id: o.listingId,
-                listingId: o.listingId as string | null,
-                label: o.vendorName,
-                price: o.price,
-                stock: o.stock,
-            })),
-        ];
-    }, [product]);
+
+        const admin = {
+            id: "admin",
+            listingId: null as string | null,
+            label: `${BRAND} Official`,
+            price: product.price,
+            stock: product.stock,
+        };
+
+        const vendor = listingParam
+            ? product.offers.find((o) => o.listingId === listingParam)
+            : undefined;
+
+        if (vendor) {
+            return [
+                {
+                    id: vendor.listingId,
+                    listingId: vendor.listingId as string | null,
+                    label: vendor.vendorName,
+                    price: vendor.price,
+                    stock: vendor.stock,
+                },
+            ];
+        }
+
+        return [admin];
+    }, [product, listingParam]);
 
     const {
         register,
@@ -176,12 +182,11 @@ export default function ProductDetailPage() {
         handleSubmit,
         formState: { errors },
     } = useForm<PurchaseForm>({
-        defaultValues: { offerId: "admin", quantity: 1 },
+        defaultValues: { quantity: 1 },
     });
 
-    const offerId = watch("offerId");
     const quantity = Number(watch("quantity")) || 1;
-    const selected = options.find((o) => o.id === offerId) ?? options[0];
+    const selected = options[0];
     const maxQty = Math.max(1, selected?.stock ?? 1);
     const outOfStock = !selected || selected.stock <= 0;
     const lowStock = !outOfStock && selected.stock <= LOW_STOCK_AT;
@@ -316,18 +321,18 @@ export default function ProductDetailPage() {
 
                             <span
                                 className={`inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-xs font-medium ${outOfStock
-                                        ? "bg-rose-50 text-rose-700"
-                                        : lowStock
-                                            ? "bg-amber-50 text-amber-800"
-                                            : "bg-emerald-50 text-emerald-700"
+                                    ? "bg-rose-50 text-rose-700"
+                                    : lowStock
+                                        ? "bg-amber-50 text-amber-800"
+                                        : "bg-emerald-50 text-emerald-700"
                                     }`}
                             >
                                 <span
                                     className={`h-1.5 w-1.5 rounded-full ${outOfStock
-                                            ? "bg-rose-500"
-                                            : lowStock
-                                                ? "bg-amber-500"
-                                                : "bg-emerald-500"
+                                        ? "bg-rose-500"
+                                        : lowStock
+                                            ? "bg-amber-500"
+                                            : "bg-emerald-500"
                                         }`}
                                 />
                                 {outOfStock
@@ -344,57 +349,35 @@ export default function ProductDetailPage() {
                             </p>
                         )}
 
-                        {/* seller picker */}
+                        {/* seller (only the one that was selected) */}
                         <fieldset className="mt-8">
                             <legend className="text-sm font-semibold text-slate-900">
                                 Sold by
                             </legend>
                             <div className="mt-3 grid gap-2.5">
-                                {options.map((o) => {
-                                    const active = o.id === offerId;
-                                    return (
-                                        <label
-                                            key={o.id}
-                                            className={`flex cursor-pointer items-center justify-between gap-4 rounded-2xl p-4 ring-1 transition focus-within:ring-2 focus-within:ring-amber-400 ${active
-                                                    ? "bg-slate-950 text-white ring-slate-950"
-                                                    : "bg-white text-slate-900 ring-slate-200 hover:ring-slate-300"
-                                                }`}
-                                        >
-                                            <span className="flex items-center gap-3">
-                                                <input
-                                                    type="radio"
-                                                    value={o.id}
-                                                    className="sr-only"
-                                                    {...register("offerId")}
-                                                />
-                                                <span
-                                                    className={`grid h-5 w-5 place-items-center rounded-full ring-1 ${active
-                                                            ? "bg-amber-300 ring-amber-300"
-                                                            : "ring-slate-300"
-                                                        }`}
-                                                >
-                                                    {active && (
-                                                        <span className="h-2 w-2 rounded-full bg-slate-950" />
-                                                    )}
+                                {options.map((o) => (
+                                    <div
+                                        key={o.id}
+                                        className="flex items-center justify-between gap-4 rounded-2xl bg-slate-950 p-4 text-white ring-1 ring-slate-950"
+                                    >
+                                        <span className="flex items-center gap-3">
+                                            <span className="grid h-5 w-5 place-items-center rounded-full bg-amber-300 ring-1 ring-amber-300">
+                                                <span className="h-2 w-2 rounded-full bg-slate-950" />
+                                            </span>
+                                            <span>
+                                                <span className="block text-sm font-medium">
+                                                    {o.label}
                                                 </span>
-                                                <span>
-                                                    <span className="block text-sm font-medium">
-                                                        {o.label}
-                                                    </span>
-                                                    <span
-                                                        className={`block text-xs ${active ? "text-slate-300" : "text-slate-500"
-                                                            }`}
-                                                    >
-                                                        {o.stock > 0 ? `${o.stock} available` : "Sold out"}
-                                                    </span>
+                                                <span className="block text-xs text-slate-300">
+                                                    {o.stock > 0 ? `${o.stock} available` : "Sold out"}
                                                 </span>
                                             </span>
-                                            <span className="text-base font-semibold">
-                                                {formatPrice(o.price)}
-                                            </span>
-                                        </label>
-                                    );
-                                })}
+                                        </span>
+                                        <span className="text-base font-semibold">
+                                            {formatPrice(o.price)}
+                                        </span>
+                                    </div>
+                                ))}
                             </div>
                         </fieldset>
 
@@ -515,7 +498,22 @@ export default function ProductDetailPage() {
                         </ul>
                     </form>
                 </div>
+                <RelatedProducts
+                    productId={product.productId}
+                    categoryId={product.categoryId}
+                />
             </div>
         </div>
     );
 }
+
+/* ---------- page (Suspense is required for useSearchParams) ---------- */
+export default function ProductDetailPage() {
+    return (
+        <Suspense fallback={null}>
+            <ProductDetailContent />
+        </Suspense>
+    );
+}
+
+

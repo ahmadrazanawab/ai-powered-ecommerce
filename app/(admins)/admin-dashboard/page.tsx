@@ -2,12 +2,21 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
+import { useQuery } from "@tanstack/react-query";
+import { api } from "@/app/lib/axios";
+
+/* ---------- API endpoints ---------- */
+const VENDORS_URL = "/api/auth/admin/vendors/get-vendors";
+const USERS_URL = "/api/auth/admin/users";
+const AUDIT_LOGS_URL = "/api/auth/admin/admin-audit-logs";
+// ASSUMPTION: change this to your real "list admins" GET route
+const ADMIN_LIST_URL = "/api/auth/admin/approve";
 
 /* ---------- placeholder data (replace with API data later) ---------- */
 const stats = [
     {
         label: "Total vendors",
-        value: "128",
+        value: "120",
         note: "+6 this week",
         tone: "bg-indigo-50 text-indigo-600 ring-indigo-100",
         icon: (
@@ -65,38 +74,15 @@ type Activity = {
     status: "approved" | "pending" | "rejected" | "suspended";
 };
 
-const activity: Activity[] = [
-    {
-        title: "New admin signup",
-        detail: "nawabalam@gmail.com is waiting for approval",
-        time: "5 min ago",
-        status: "pending",
-    },
-    {
-        title: "Vendor approved",
-        detail: "Fresh Mart was approved by a super admin",
-        time: "1 hour ago",
-        status: "approved",
-    },
-    {
-        title: "Vendor rejected",
-        detail: "Incomplete business documents",
-        time: "3 hours ago",
-        status: "rejected",
-    },
-    {
-        title: "Admin suspended",
-        detail: "Suspended for policy violation",
-        time: "Yesterday",
-        status: "suspended",
-    },
-    {
-        title: "Customer blocked",
-        detail: "Multiple failed payment attempts",
-        time: "Yesterday",
-        status: "suspended",
-    },
-];
+/* shape of one row returned by the audit logs API */
+type AuditLog = {
+    action: string;
+    targetType: string;
+    targetId: string;
+    adminId: string;
+    resean?: string | null; // spelled this way in your API
+    createdAt: string;
+};
 
 const statusStyles: Record<Activity["status"], { badge: string; dot: string }> = {
     pending: {
@@ -139,15 +125,155 @@ const quickLinks = [
 const cardCls =
     "rounded-3xl bg-white shadow-[0_20px_60px_-20px_rgba(15,23,42,0.18)] ring-1 ring-slate-200/70";
 
+type VendorRow = { status?: string; isActive?: boolean };
+type AdminRow = { status?: string; isActive?: boolean };
+
+/* ---------- helpers for Recent activity ---------- */
+
+// "vendor_approved" / "admin-suspend" -> "Vendor approved" / "Admin suspend"
+function humanize(value: string): string {
+    const text = (value ?? "").replace(/[_-]+/g, " ").trim().toLowerCase();
+    return text ? text.charAt(0).toUpperCase() + text.slice(1) : "Action";
+}
+
+// map any action string to one of the 4 badge styles
+function actionToStatus(action: string): Activity["status"] {
+    const a = (action ?? "").toLowerCase();
+    if (a.includes("reject") || a.includes("delete") || a.includes("remove")) return "rejected";
+    if (a.includes("suspend") || a.includes("block")) return "suspended";
+    if (a.includes("pending") || a.includes("signup") || a.includes("register")) return "pending";
+    return "approved"; // approve, reactivate, unblock, update, etc.
+}
+
+function timeAgo(dateStr: string): string {
+    const diff = Date.now() - new Date(dateStr).getTime();
+    if (Number.isNaN(diff)) return "";
+    const min = Math.floor(diff / 60000);
+    if (min < 1) return "Just now";
+    if (min < 60) return `${min} min ago`;
+    const hr = Math.floor(min / 60);
+    if (hr < 24) return `${hr} hour${hr === 1 ? "" : "s"} ago`;
+    const day = Math.floor(hr / 24);
+    if (day === 1) return "Yesterday";
+    if (day < 7) return `${day} days ago`;
+    return new Date(dateStr).toLocaleDateString("en-IN", {
+        day: "numeric",
+        month: "short",
+    });
+}
+
+function toActivity(log: AuditLog): Activity {
+    const target = humanize(log.targetType);
+    const reason = log.resean?.trim();
+    return {
+        title: humanize(log.action),
+        detail: reason ? `${target} · ${reason}` : target,
+        time: timeAgo(log.createdAt),
+        status: actionToStatus(log.action),
+    };
+}
+
 export default function AdminDashboardPage() {
     const [role, setRole] = useState("");
+    const [totalVendors, setTotalVendors] = useState(0);
+
+    const isSuperAdmin = role === "super_admin";
+
+    /* ---------- Vendors (total + pending) ---------- */
+    const { data } = useQuery({
+        queryKey: ["TotalVendor"],
+        queryFn: async () => {
+            const res = await api.get(VENDORS_URL);
+            return res.data;
+        }
+    });
+
+    /* ---------- Customers (total) ---------- */
+    const { data: usersData } = useQuery({
+        queryKey: ["TotalCustomers"],
+        queryFn: async () => {
+            const res = await api.get(USERS_URL, {
+                params: { page: 1, limit: 1 },
+            });
+            return res.data;
+        },
+    });
+
+    /* ---------- Admins (pending + active) - super admin only ---------- */
+    const { data: adminsData } = useQuery({
+        queryKey: ["DashboardAdmins"],
+        queryFn: async () => {
+            const res = await api.get(ADMIN_LIST_URL);
+            return res.data;
+        },
+        enabled: isSuperAdmin,
+    });
+
+    /* ---------- Recent activity (audit logs) ---------- */
+    const {
+        data: auditData,
+        isPending: activityLoading,
+        isError: activityError,
+    } = useQuery({
+        queryKey: ["DashboardRecentActivity"],
+        queryFn: async () => {
+            const res = await api.get(AUDIT_LOGS_URL);
+            return res.data;
+        },
+    });
+
+    useEffect(() => {
+        if (data?.vendorDetails) {
+            setTotalVendors(data.vendorDetails.length);
+        }
+    }, [data]);
+
 
     useEffect(() => {
         setRole(localStorage.getItem("admin_role") ?? "");
     }, []);
 
-    const isSuperAdmin = role === "super_admin";
     const links = quickLinks.filter((l) => !l.superAdminOnly || isSuperAdmin);
+
+    /* ---------- Derived stat values ---------- */
+    const vendorList: VendorRow[] = data?.vendorDetails ?? [];
+    const adminList: AdminRow[] =
+        adminsData?.admins ?? adminsData?.adminDetails ?? [];
+
+    const totalCustomers: number = usersData?.stats?.total ?? 0;
+
+    const pendingVendors = vendorList.filter(
+        (v) => v.status === "pending"
+    ).length;
+
+    const pendingAdmins = adminList.filter(
+        (a) => a.status === "pending"
+    ).length;
+
+    const activeAdmins = adminList.filter(
+        (a) => a.status === "approved" && a.isActive
+    ).length;
+
+    const statValues: Record<string, string | number> = {
+        "Total vendors": totalVendors,
+        "Total customers": totalCustomers.toLocaleString("en-IN"),
+        "Pending approvals": pendingVendors + (isSuperAdmin ? pendingAdmins : 0),
+        "Active admins": isSuperAdmin ? activeAdmins : "—",
+    };
+
+    /* ---------- Derived recent activity (latest 5, newest first) ---------- */
+    const auditLogs: AuditLog[] = Array.isArray(auditData?.getAuditLogs)
+        ? auditData.getAuditLogs
+        : [];
+
+    const activity: Activity[] = [...auditLogs]
+        .sort(
+            (a, b) =>
+                new Date(b.createdAt).getTime() -
+                new Date(a.createdAt).getTime()
+        )
+        .slice(0, 5)
+        .map(toActivity);
 
     return (
         <div className="mx-auto max-w-6xl space-y-6">
@@ -215,7 +341,7 @@ export default function AdminDashboardPage() {
                             </span>
                         </div>
                         <p className="mt-4 text-3xl font-semibold tracking-tight text-slate-900">
-                            {s.value}
+                            {statValues[s.label] ?? s.value}
                         </p>
                         <p className="mt-1 text-sm text-slate-400">{s.note}</p>
                     </div>
@@ -240,39 +366,53 @@ export default function AdminDashboardPage() {
                         )}
                     </div>
 
-                    <ul className="mt-4 divide-y divide-slate-100">
-                        {activity.map((item, i) => {
-                            const style = statusStyles[item.status];
-                            return (
-                                <li
-                                    key={i}
-                                    className="flex flex-col gap-2 py-4 first:pt-0 last:pb-0 sm:flex-row sm:items-center sm:justify-between"
-                                >
-                                    <div className="min-w-0">
-                                        <p className="text-sm font-medium text-slate-900">
-                                            {item.title}
-                                        </p>
-                                        <p className="mt-0.5 break-words text-sm text-slate-500">
-                                            {item.detail}
-                                        </p>
-                                    </div>
-                                    <div className="flex items-center gap-3 sm:shrink-0">
-                                        <span
-                                            className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-0.5 text-xs font-medium capitalize ring-1 ${style.badge}`}
-                                        >
+                    {activityLoading ? (
+                        <p className="mt-4 text-sm text-slate-500">
+                            Loading activity...
+                        </p>
+                    ) : activityError ? (
+                        <p className="mt-4 text-sm text-slate-500">
+                            Could not load recent activity.
+                        </p>
+                    ) : activity.length === 0 ? (
+                        <p className="mt-4 text-sm text-slate-500">
+                            No recent activity yet.
+                        </p>
+                    ) : (
+                        <ul className="mt-4 divide-y divide-slate-100">
+                            {activity.map((item, i) => {
+                                const style = statusStyles[item.status];
+                                return (
+                                    <li
+                                        key={i}
+                                        className="flex flex-col gap-2 py-4 first:pt-0 last:pb-0 sm:flex-row sm:items-center sm:justify-between"
+                                    >
+                                        <div className="min-w-0">
+                                            <p className="text-sm font-medium text-slate-900">
+                                                {item.title}
+                                            </p>
+                                            <p className="mt-0.5 break-words text-sm text-slate-500">
+                                                {item.detail}
+                                            </p>
+                                        </div>
+                                        <div className="flex items-center gap-3 sm:shrink-0">
                                             <span
-                                                className={`h-1.5 w-1.5 rounded-full ${style.dot}`}
-                                            />
-                                            {item.status}
-                                        </span>
-                                        <span className="text-xs text-slate-400">
-                                            {item.time}
-                                        </span>
-                                    </div>
-                                </li>
-                            );
-                        })}
-                    </ul>
+                                                className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-0.5 text-xs font-medium capitalize ring-1 ${style.badge}`}
+                                            >
+                                                <span
+                                                    className={`h-1.5 w-1.5 rounded-full ${style.dot}`}
+                                                />
+                                                {item.status}
+                                            </span>
+                                            <span className="text-xs text-slate-400">
+                                                {item.time}
+                                            </span>
+                                        </div>
+                                    </li>
+                                );
+                            })}
+                        </ul>
+                    )}
                 </div>
 
                 {/* Quick links */}
