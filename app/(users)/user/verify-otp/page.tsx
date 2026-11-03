@@ -108,6 +108,16 @@ const Page = () => {
                 data
             );
 
+            const user = res.data;
+
+            if (!user?.token) {
+                throw new Error("Token not found");
+            }
+
+            localStorage.setItem("user_token", user.token);
+            localStorage.setItem("user_id", user?.user?.id);
+           
+            console.log("User token saved");
             return res.data;
         },
 
@@ -117,10 +127,11 @@ const Page = () => {
             sessionStorage.removeItem("opt_identifier");
             sessionStorage.removeItem("purpose");
 
+
             reset();
 
             // Redirect after successful verification
-            router.push("/");
+            router.push("/user");
             // if (purpose === "signup") {
             //     router.push("/user/login");
             // } else {

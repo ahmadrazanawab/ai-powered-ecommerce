@@ -15,6 +15,18 @@ import {
 
 type AuthPurpose = "login" | "signup";
 
+/*
+message: "Customer login successful"
+success: true
+token: "eyJhbGciOiJIUzI1NiJ9.eyJ1c2VySWQiOiIxYzM3ZDA1MS1hNTUxLTQ2ZWQtYTU5OS1lOTUwNDkxNmQyNDIiLCJyb2xlIjoiVVNFUiIsImVtYWlsIjoiYW5hbUBnbWFpbC5jb20iLCJpYXQiOjE3OTM3MjI2MDIsImV4cCI6MTc5NDMyNzQwMn0.5_Ek1D1fUQGc-XS-5SMs0s1odekYGxYpCQC8jtX0yR8"
+user: 
+    email: "anam@gmail.com"
+    id: "1c37d051-a551-46ed-a599-e9504916d242"
+    mobileNo: null
+    name: null
+*/
+
+
 const Page = () => {
     const router = useRouter();
 

@@ -205,6 +205,7 @@ export async function POST(request: NextRequest) {
                     name: users.name,
                     email: users.email,
                     mobileNo: users.mobileNo,
+                    isActive:users.isVerified
                 });
 
             user = createdUser;
@@ -255,6 +256,7 @@ export async function POST(request: NextRequest) {
             userId: user.id,
             role: "USER",
             email: user.email,
+            mobileNo:user.mobileNo
         })
             .setProtectedHeader({ alg: "HS256" })
             .setIssuedAt()

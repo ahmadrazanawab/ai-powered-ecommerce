@@ -7,6 +7,7 @@ import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useQuery } from "@tanstack/react-query";
 import { api } from "@/app/lib/axios";
+import { useUserSession } from "@/app/hooks/use-user-session";
 
 /* ---------- edit these to match your store ---------- */
 const BRAND = "Aurelia";
@@ -153,6 +154,12 @@ export default function Navbar({
         return () => window.removeEventListener("scroll", onScroll);
     }, []);
 
+    /*logout */
+    const { authUser, logout, isLoggingOut, isLoading } = useUserSession();
+
+    const isLoggedIn = !!authUser;
+
+    const initial = authUser?.name?.charAt(0).toUpperCase() || "U";
     /* Close everything when the route changes */
     useEffect(() => {
         setDrawerOpen(false);
@@ -232,7 +239,7 @@ export default function Navbar({
         </form>
     );
 
-    const initial = user?.name?.charAt(0) ?? "";
+    // const initial = user?.name?.charAt(0) ?? "";
 
     return (
         <>
@@ -425,7 +432,11 @@ export default function Navbar({
 
                         {/* Desktop account area */}
                         <div className="ml-1 hidden items-center gap-2 lg:flex">
-                            {user ? (
+                            {isLoading ? (
+                                // Loading user profile
+                                <div className="h-10 w-24 animate-pulse rounded-xl bg-white/10" />
+
+                            ) : isLoggedIn ? (
                                 <div data-menu className="relative">
                                     <button
                                         type="button"
@@ -453,19 +464,24 @@ export default function Navbar({
                                         <div className="absolute right-0 top-full z-50 mt-3 w-64 rounded-2xl bg-white p-2 shadow-2xl ring-1 ring-slate-200/70">
                                             <div className="px-3 py-3">
                                                 <p className="truncate text-sm font-semibold text-slate-900">
-                                                    {user.name}
+                                                    {authUser.name || "Customer"}
                                                 </p>
-                                                {user.email && (
+                                                {authUser?.email != null && (
                                                     <p className="truncate text-xs text-slate-500">
-                                                        {user.email}
+                                                        {authUser?.email}
+                                                    </p>
+                                                )}
+                                                {authUser?.mobileNo != null && (
+                                                    <p className="truncate text-xs text-slate-500">
+                                                        {authUser?.mobileNo}
                                                     </p>
                                                 )}
                                             </div>
                                             <div className="border-t border-slate-100 pt-1">
                                                 {[
-                                                    { label: "My account", href: "/account", icon: "user" as const },
-                                                    { label: "My orders", href: "/orders", icon: "box" as const },
-                                                    { label: "Wishlist", href: "/wishlist", icon: "heart" as const },
+                                                    { label: "My account", href: "/user/account", icon: "user" as const },
+                                                    { label: "My orders", href: "/user/orders", icon: "box" as const },
+                                                    { label: "Wishlist", href: "/user/wishlist", icon: "heart" as const },
                                                 ].map((item) => (
                                                     <Link
                                                         key={item.href}
@@ -481,13 +497,14 @@ export default function Navbar({
                                                 <button
                                                     type="button"
                                                     onClick={() => {
-                                                        setOpenMenu(null);
-                                                        onLogout?.();
+                                                        setDrawerOpen(false);
+                                                        logout();
                                                     }}
+                                                    disabled={isLoggingOut}
                                                     className="flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-sm text-rose-600 transition-colors hover:bg-rose-50"
                                                 >
                                                     <Icon name="logout" className="h-[18px] w-[18px]" />
-                                                    Log out
+                                                    {isLoggingOut ? "Logging out..." : "Log out"}
                                                 </button>
                                             </div>
                                         </div>
@@ -663,23 +680,33 @@ export default function Navbar({
 
                     {/* Drawer footer: account */}
                     <div className="relative border-t border-white/10 p-4">
-                        {user ? (
+                        {isLoading ? (
+                            <div className="animate-pulse space-y-3">
+                                <div className="h-10 w-full rounded-xl bg-white/10" />
+                                <div className="h-10 w-full rounded-xl bg-white/10" />
+                            </div>
+                        ) : isLoggedIn ? (
                             <div className="space-y-1">
                                 <div className="mb-2 flex items-center gap-3 px-2">
                                     <span className="grid h-10 w-10 place-items-center rounded-xl bg-gradient-to-br from-amber-200 to-amber-400 text-sm font-semibold uppercase text-slate-950">
                                         {initial}
                                     </span>
                                     <div className="min-w-0">
-                                        <p className="truncate text-sm font-medium">{user.name}</p>
-                                        {user.email && (
+                                        <p className="truncate text-sm font-medium">{authUser.name || "Customer"}</p>
+                                        {authUser.email != null && (
                                             <p className="truncate text-xs text-slate-400">
-                                                {user.email}
+                                                {authUser.email}
+                                            </p>
+                                        )}
+                                        {authUser.mobileNo != null && (
+                                            <p className="truncate text-xs text-slate-400">
+                                                {authUser.mobileNo}
                                             </p>
                                         )}
                                     </div>
                                 </div>
                                 <Link
-                                    href="/account"
+                                    href="/user/account"
                                     onClick={() => setDrawerOpen(false)}
                                     className="flex items-center gap-3 rounded-xl px-4 py-2.5 text-sm text-slate-300 hover:bg-white/10 hover:text-white"
                                 >
@@ -687,7 +714,7 @@ export default function Navbar({
                                     My account
                                 </Link>
                                 <Link
-                                    href="/orders"
+                                    href="/user/orders"
                                     onClick={() => setDrawerOpen(false)}
                                     className="flex items-center gap-3 rounded-xl px-4 py-2.5 text-sm text-slate-300 hover:bg-white/10 hover:text-white"
                                 >
@@ -698,25 +725,26 @@ export default function Navbar({
                                     type="button"
                                     onClick={() => {
                                         setDrawerOpen(false);
-                                        onLogout?.();
+                                        logout();
                                     }}
+                                    disabled={isLoggingOut}
                                     className="flex w-full items-center gap-3 rounded-xl px-4 py-2.5 text-sm text-slate-300 hover:bg-white/10 hover:text-white"
                                 >
                                     <Icon name="logout" className="h-[18px] w-[18px]" />
-                                    Log out
+                                    {isLoggingOut ? "Logging out..." : "Log out"}
                                 </button>
                             </div>
                         ) : (
                             <div className="grid grid-cols-2 gap-3">
                                 <Link
-                                    href="/login"
+                                    href="/user/auth-user"
                                     onClick={() => setDrawerOpen(false)}
                                     className="inline-flex h-11 items-center justify-center rounded-xl border border-white/20 text-sm font-medium text-white transition-colors hover:bg-white/10"
                                 >
                                     Log in
                                 </Link>
                                 <Link
-                                    href="/signup"
+                                    href="/user/auth-user"
                                     onClick={() => setDrawerOpen(false)}
                                     className={`${goldBtn} h-11`}
                                 >
