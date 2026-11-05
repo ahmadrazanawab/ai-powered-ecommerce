@@ -417,7 +417,7 @@ export default function Navbar({
                         </button>
 
                         <Link
-                            href="/wishlist"
+                            href="/user/wishlist"
                             aria-label="Wishlist"
                             className={`${iconBtn} hidden sm:grid`}
                         >
@@ -425,7 +425,7 @@ export default function Navbar({
                             <Badge count={wishlistCount} />
                         </Link>
 
-                        <Link href="/cart" aria-label="Shopping bag" className={iconBtn}>
+                        <Link href="/user/cart" aria-label="Shopping bag" className={iconBtn}>
                             <Icon name="bag" />
                             <Badge count={cartCount} />
                         </Link>
@@ -665,7 +665,7 @@ export default function Navbar({
                         ))}
 
                         <Link
-                            href="/wishlist"
+                            href="/user/wishlist"
                             onClick={() => setDrawerOpen(false)}
                             className="flex items-center justify-between rounded-xl px-4 py-3 text-sm font-medium text-slate-300 transition-colors hover:bg-white/10 hover:text-white sm:hidden"
                         >

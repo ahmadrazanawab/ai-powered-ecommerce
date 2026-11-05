@@ -1,4 +1,4 @@
-
+// file : checkout-schema.ts
 import {
     pgTable,
     uuid,
