@@ -33,6 +33,16 @@ const paths = {
             <path d="M12 11v10" />
         </>
     ),
+    orders: (
+        <>
+            <path d="M8 6h13" />
+            <path d="M8 12h13" />
+            <path d="M8 18h13" />
+            <path d="M3 6h.01" />
+            <path d="M3 12h.01" />
+            <path d="M3 18h.01" />
+        </>
+    ),
     vendors: (
         <>
             <path d="M3 9 5 4h14l2 5" />
@@ -123,6 +133,11 @@ const navSections: NavSection[] = [
                 label: "Products",
                 href: "/admin-dashboard/products",
                 icon: "products",
+            },
+            {
+                label: "Orders",
+                href: "/admin-dashboard/orders",
+                icon: "orders",
             },
         ],
     },
@@ -287,11 +302,10 @@ export default function AdminDashboardLayout({
                                         key={item.href}
                                         href={item.href}
                                         aria-current={active ? "page" : undefined}
-                                        className={`flex items-center gap-3 rounded-xl px-4 py-3 text-sm font-medium transition-colors ${
-                                            active
-                                                ? "bg-white text-slate-900 shadow-lg shadow-black/20"
-                                                : "text-slate-300 hover:bg-white/10 hover:text-white"
-                                        }`}
+                                        className={`flex items-center gap-3 rounded-xl px-4 py-3 text-sm font-medium transition-colors ${active
+                                            ? "bg-white text-slate-900 shadow-lg shadow-black/20"
+                                            : "text-slate-300 hover:bg-white/10 hover:text-white"
+                                            }`}
                                     >
                                         <Icon name={item.icon} />
                                         {item.label}
@@ -326,21 +340,18 @@ export default function AdminDashboardLayout({
 
             {/* Mobile drawer */}
             <div
-                className={`fixed inset-0 z-40 lg:hidden ${
-                    sidebarOpen ? "" : "pointer-events-none"
-                }`}
+                className={`fixed inset-0 z-40 lg:hidden ${sidebarOpen ? "" : "pointer-events-none"
+                    }`}
                 aria-hidden={!sidebarOpen}
             >
                 <div
                     onClick={() => setSidebarOpen(false)}
-                    className={`absolute inset-0 bg-slate-950/50 backdrop-blur-sm transition-opacity ${
-                        sidebarOpen ? "opacity-100" : "opacity-0"
-                    }`}
+                    className={`absolute inset-0 bg-slate-950/50 backdrop-blur-sm transition-opacity ${sidebarOpen ? "opacity-100" : "opacity-0"
+                        }`}
                 />
                 <aside
-                    className={`absolute inset-y-0 left-0 w-72 max-w-[85%] transition-transform duration-200 ${
-                        sidebarOpen ? "translate-x-0" : "-translate-x-full"
-                    }`}
+                    className={`absolute inset-y-0 left-0 w-72 max-w-[85%] transition-transform duration-200 ${sidebarOpen ? "translate-x-0" : "-translate-x-full"
+                        }`}
                 >
                     <button
                         type="button"

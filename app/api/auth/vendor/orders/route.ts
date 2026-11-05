@@ -1,3 +1,5 @@
+// file : app/api/auth/vendor/orders/route.ts
+
 import { NextRequest, NextResponse } from "next/server";
 import { desc, eq, and } from "drizzle-orm";
 
