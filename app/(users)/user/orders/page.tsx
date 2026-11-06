@@ -219,8 +219,8 @@ function Progress({ status }: { status: OrderStatus }) {
                     <li key={step} className="min-w-0">
                         <div
                             className={`h-1.5 rounded-full ${done
-                                    ? "bg-gradient-to-r from-amber-300 to-amber-400"
-                                    : "bg-slate-200"
+                                ? "bg-gradient-to-r from-amber-300 to-amber-400"
+                                : "bg-slate-200"
                                 }`}
                         />
                         <p
@@ -269,6 +269,7 @@ function OrderCard({ order }: { order: OrderI }) {
     const addr = order.shippingAddress ?? {};
     const detailsId = `order-details-${order.id}`;
 
+
     const cancelError = cancel.error as
         | { response?: { data?: { message?: string } } }
         | null;
@@ -300,7 +301,19 @@ function OrderCard({ order }: { order: OrderI }) {
                                 item.productId
                             )}`}
                         >
-                            <GemIcon className="h-6 w-6" />
+                            {/* <GemIcon className="h-6 w-6" /> */}
+                            {item.imageUrl ? (
+                                // eslint-disable-next-line @next/next/no-img-element
+                                <img
+                                    src={item.imageUrl}
+                                    alt={item.productName}
+                                    loading="lazy"
+                                    className="h-full w-full object-cover"
+                                />
+                            ) : (
+                                <GemIcon className="h-6 w-6" />
+                            )}
+
                         </div>
                     ))}
 
@@ -441,7 +454,17 @@ function OrderCard({ order }: { order: OrderI }) {
                                             item.productId
                                         )}`}
                                     >
-                                        <GemIcon className="h-5 w-5" />
+                                        {/* <GemIcon className="h-5 w-5" /> */}
+                                        {item.imageUrl ? (
+                                            <img
+                                                src={item.imageUrl}
+                                                alt={item.productName}
+                                                loading="lazy"
+                                                className="h-full w-full object-cover"
+                                            />
+                                        ) : (
+                                            <GemIcon className="h-5 w-5" />
+                                        )}
                                     </div>
 
                                     <div className="min-w-0 flex-1">
@@ -457,7 +480,7 @@ function OrderCard({ order }: { order: OrderI }) {
                                             <span
                                                 className={`ml-2 font-medium ${ITEM_STATUS_STYLE[
                                                     item.fulfillmentStatus
-                                                    ]
+                                                ]
                                                     }`}
                                             >
                                                 {titleCase(item.fulfillmentStatus)}
@@ -678,16 +701,16 @@ export default function CustomerOrdersPage() {
                                         })
                                     }
                                     className={`shrink-0 rounded-full px-4 py-2 text-sm font-medium transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-400 ${active
-                                            ? "bg-slate-950 text-amber-300 shadow-md shadow-slate-950/20"
-                                            : "bg-slate-100 text-slate-700 hover:bg-slate-200"
+                                        ? "bg-slate-950 text-amber-300 shadow-md shadow-slate-950/20"
+                                        : "bg-slate-100 text-slate-700 hover:bg-slate-200"
                                         }`}
                                 >
                                     {f.label}
                                     {!isPending && (
                                         <span
                                             className={`ml-1.5 text-xs ${active
-                                                    ? "text-amber-300/70"
-                                                    : "text-slate-500"
+                                                ? "text-amber-300/70"
+                                                : "text-slate-500"
                                                 }`}
                                         >
                                             {counts[f.value] ?? 0}
@@ -823,8 +846,8 @@ export default function CustomerOrdersPage() {
                                     onClick={() => goToPage(p)}
                                     aria-current={p === safePage ? "page" : undefined}
                                     className={`${base} ${p === safePage
-                                            ? "bg-slate-950 text-amber-300 ring-slate-950"
-                                            : "bg-white text-slate-700 ring-slate-200 hover:bg-slate-50"
+                                        ? "bg-slate-950 text-amber-300 ring-slate-950"
+                                        : "bg-white text-slate-700 ring-slate-200 hover:bg-slate-50"
                                         }`}
                                 >
                                     {p}

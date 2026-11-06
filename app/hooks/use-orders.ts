@@ -34,6 +34,7 @@ export interface OrderItemI {
     listingId: string;
     productId: string;
     productName: string;
+    imageUrl: string | null;
     quantity: number;
     unitPrice: string;
     lineTotal: string;

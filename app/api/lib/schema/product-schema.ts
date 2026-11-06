@@ -1,4 +1,4 @@
-
+// app/api/lib/schema/product-schema.ts
 import {
     pgTable,
     uuid,
