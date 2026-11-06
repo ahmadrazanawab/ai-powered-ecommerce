@@ -329,7 +329,7 @@ export default function CategoryPage() {
                                             : "bg-slate-100 text-slate-700 hover:bg-slate-200"
                                         }`}
                                 >
-                                    {c.name}
+                                  {c.name}
                                 </Link>
                             );
                         })}

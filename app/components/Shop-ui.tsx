@@ -4,6 +4,8 @@
 
 import { useEffect, useState, type ReactNode } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
+import { useAddToCart } from "@/app/hooks/use-cart";
 
 /* ---------- edit these to match your store ---------- */
 export const BRAND = "Aurelia";
@@ -156,14 +158,77 @@ function getPages(current: number, total: number): (number | "…")[] {
 export function ProductCard({ product }: { product: ProductI }) {
     const outOfStock = product.stock <= 0;
     const lowStock = !outOfStock && product.stock <= LOW_STOCK_AT;
-    const seller = product.vendorName ?? `${BRAND} Official`;
+    // const seller = product.vendorName ?? `${BRAND} Official`;
+    const router = useRouter();
+    const addToCart = useAddToCart();
+
+    const isVendorProduct =
+        typeof product.listingId === "string" &&
+        product.listingId.trim().length > 0;
+    const seller = product.vendorName ?? "Vendor";
+
+    // Always retain the selected vendor listing.
+    const href = isVendorProduct
+        ? `/user/shop/${product.slug}?listing=${encodeURIComponent(product.listingId!)}`
+        : "#";
+
+    const cartError = addToCart.error as
+        | {
+            response?: {
+                status?: number;
+                data?: { message?: string };
+            };
+        }
+        | null;
+
+    const handleError = (err: unknown) => {
+        const status = (
+            err as { response?: { status?: number } }
+        )?.response?.status;
+
+        if (status === 401) {
+            router.push("/user/login");
+        }
+    };
+
+
+    const handleAddToCart = () => {
+        if (!isVendorProduct || outOfStock) return;
+
+        addToCart.mutate(
+            {
+                productId: product.productId,
+                listingId: product.listingId!,
+                quantity: 1,
+            },
+            {
+                onError: handleError,
+            }
+        );
+    };
+
+    const handleBuyNow = () => {
+        if (!isVendorProduct || outOfStock) return;
+
+        addToCart.mutate(
+            {
+                productId: product.productId,
+                listingId: product.listingId!,
+                quantity: 1,
+            },
+            {
+                onSuccess: () => router.push("/user/checkout"),
+                onError: handleError,
+            }
+        );
+    };
 
     return (
         <article
             className={`${cardCls} group flex flex-col overflow-hidden transition-all duration-300 hover:-translate-y-1 hover:shadow-[0_28px_70px_-20px_rgba(15,23,42,0.3)]`}
         >
             <Link
-                href={`/user/shop/${product.slug}`}
+                href={href}
                 className="relative block aspect-square overflow-hidden focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-amber-400"
             >
                 <div className={`absolute inset-0 bg-gradient-to-br ${toneFor(product.productId)}`}>
@@ -196,7 +261,6 @@ export function ProductCard({ product }: { product: ProductI }) {
                         </span>
                     ) : null}
                 </div>
-
                 <span className="absolute right-3 top-3 rounded-full bg-white/85 px-2.5 py-1 text-[11px] font-medium text-slate-700 backdrop-blur">
                     {product.categoryName}
                 </span>
@@ -211,9 +275,11 @@ export function ProductCard({ product }: { product: ProductI }) {
                     <span className="line-clamp-1">{seller}</span>
                 </p>
 
+                {/* <p className="text-xl text-red-700">this is testiing box slug</p> */}
+
                 <h3 className="mt-1.5 line-clamp-1 text-sm font-semibold text-slate-900 sm:text-base">
                     <Link
-                        href={`/user/products/${product.slug}`}
+                        href={href}
                         className="hover:underline focus-visible:outline-none focus-visible:underline"
                     >
                         {product.name}
@@ -226,25 +292,46 @@ export function ProductCard({ product }: { product: ProductI }) {
                     </p>
                 )}
 
+                {/* product price */}
                 <div className="mt-auto flex items-center justify-between gap-2 pt-4">
                     <p className="text-lg font-semibold tracking-tight text-slate-900">
                         {formatPrice(product.price)}
                     </p>
+                </div>
 
+                {/* Buy + Add to cart */}
+                <div className="mt-3 grid grid-cols-2 gap-2">
                     <button
                         type="button"
-                        disabled={outOfStock}
+                        disabled={outOfStock || addToCart.isPending}
+                        onClick={handleAddToCart}
                         aria-label={`Add ${product.name} to cart`}
-                        // TODO: connect to useAddToCart()
-                        onClick={() => undefined}
-                        className="grid h-10 w-10 place-items-center rounded-xl bg-slate-950 text-amber-300 transition hover:bg-slate-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-400 focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:bg-slate-200 disabled:text-slate-400"
+                        className="inline-flex h-10 items-center justify-center gap-1.5 rounded-xl bg-slate-950 px-3 text-xs font-semibold text-amber-300 transition hover:bg-slate-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-400 focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:bg-slate-200 disabled:text-slate-400 sm:text-sm"
                     >
-                        <Svg className="h-5 w-5">
+                        <Svg className="h-4 w-4">
                             <path d="M6 7h12l-1 12H7L6 7Z" />
                             <path d="M9 7a3 3 0 0 1 6 0" />
                         </Svg>
+
+                        {addToCart.isPending
+                            ? "Adding…"
+                            : addToCart.isSuccess
+                                ? "Added"
+                                : "Add to cart"}
+                    </button>
+
+                    <button
+                        type="button"
+                        disabled={outOfStock || addToCart.isPending}
+                        onClick={handleBuyNow}
+                        aria-label={`Buy ${product.name} now`}
+                        className="inline-flex h-10 items-center justify-center rounded-xl bg-gradient-to-br from-amber-200 to-amber-400 px-3 text-xs font-semibold text-slate-950 transition hover:from-amber-100 hover:to-amber-300 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-400 focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:from-slate-200 disabled:to-slate-200 disabled:text-slate-400 sm:text-sm"
+                    >
+                        Buy now
                     </button>
                 </div>
+
+
             </div>
         </article>
     );
@@ -307,8 +394,8 @@ export function Pagination({
                         onClick={() => onChange(p)}
                         aria-current={p === page ? "page" : undefined}
                         className={`${base} ${p === page
-                                ? "bg-slate-950 text-amber-300 ring-slate-950"
-                                : "bg-white text-slate-700 ring-slate-200 hover:bg-slate-50"
+                            ? "bg-slate-950 text-amber-300 ring-slate-950"
+                            : "bg-white text-slate-700 ring-slate-200 hover:bg-slate-50"
                             }`}
                     >
                         {p}
