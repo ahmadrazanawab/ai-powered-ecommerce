@@ -183,6 +183,7 @@ function WishlistCard({
 
     const name = item.name ?? "Unavailable product";
     const unavailable = !item.available;
+
     const stock = item.stock ?? 0;
     const outOfStock = !unavailable && stock <= 0;
     const lowStock = !unavailable && !outOfStock && stock <= LOW_STOCK_AT;
@@ -234,8 +235,8 @@ function WishlistCard({
                         alt={name}
                         loading="lazy"
                         className={`h-full w-full object-cover transition-transform duration-500 group-hover:scale-105 ${outOfStock || unavailable
-                                ? "opacity-60 grayscale"
-                                : ""
+                            ? "opacity-60 grayscale"
+                            : ""
                             }`}
                     />
                 ) : (
@@ -319,7 +320,7 @@ function WishlistCard({
 
                 {unavailable ? (
                     <p className="mt-1 text-xs leading-relaxed text-slate-500">
-                        {item.message ??
+                        {item.description ??
                             "The vendor has removed this product. You can remove it from your wishlist."}
                     </p>
                 ) : (
@@ -424,11 +425,23 @@ export default function WishlistPage() {
         useWishlist();
 
     // not signed in → login
+    // useEffect(() => {
+    //     const code = (error as { response?: { status?: number } } | null)
+    //         ?.response?.status;
+    //     if (code === 401) router.push("/user/login");
+    // }, [error, router]);
+
     useEffect(() => {
-        const code = (error as { response?: { status?: number } } | null)
-            ?.response?.status;
-        if (code === 401) router.push("/user/login");
-    }, [error, router]);
+        const status = (
+            remove.error as {
+                response?: { status?: number };
+            } | null
+        )?.response?.status;
+
+        if (status === 401) {
+            router.push("/user/login");
+        }
+    }, [remove.error, router]);
 
     useEffect(() => {
         const sub = watch(() => setPage(1));
@@ -785,7 +798,7 @@ export default function WishlistPage() {
                             <p className="mt-2 text-sm text-slate-600">
                                 {hasFilters
                                     ? "Try a different search."
-                                    : "Tap the heart on any product to save it here for later."}
+                                    : "Explore our shop and save your favourite products here for later."}
                             </p>
 
                             {hasFilters ? (
@@ -855,8 +868,8 @@ export default function WishlistPage() {
                                     onClick={() => goToPage(p)}
                                     aria-current={p === safePage ? "page" : undefined}
                                     className={`${pageBtn} ${p === safePage
-                                            ? "bg-slate-950 text-amber-300 ring-slate-950"
-                                            : "bg-white text-slate-700 ring-slate-200 hover:bg-slate-50"
+                                        ? "bg-slate-950 text-amber-300 ring-slate-950"
+                                        : "bg-white text-slate-700 ring-slate-200 hover:bg-slate-50"
                                         }`}
                                 >
                                     {p}

@@ -8,6 +8,13 @@ import { useForm } from "react-hook-form";
 import { api } from "@/app/lib/axios";
 import { useRouter } from "next/navigation";
 import { useAddToCart } from "@/app/hooks/use-cart";
+import { Heart } from "lucide-react";
+import {
+    useAddToWishlist,
+    useRemoveFromWishlist,
+    useWishlist,
+    type WishlistItemI,
+} from "@/app/hooks/use-wishlist";
 
 
 /* ---------- edit these to match your store ---------- */
@@ -66,7 +73,6 @@ const DEFAULT_FILTERS: FiltersForm = {
     sort: "newest-desc",
 };
 
-/* fallback gradients for products without an image */
 const TONES = [
     "from-slate-900 to-indigo-900",
     "from-indigo-950 to-slate-800",
@@ -186,7 +192,13 @@ function getPages(current: number, total: number): (number | "…")[] {
 
 function ProductCard({ product }: { product: ProductI }) {
     const router = useRouter();
+
     const addToCart = useAddToCart();
+
+    const addToWishlist = useAddToWishlist();
+    const removeFromWishlist = useRemoveFromWishlist();
+
+    const { data: wishlistData } = useWishlist();
 
     const isVendorProduct =
         typeof product.listingId === "string" &&
@@ -204,11 +216,11 @@ function ProductCard({ product }: { product: ProductI }) {
 
     const cartError = addToCart.error as
         | {
-              response?: {
-                  status?: number;
-                  data?: { message?: string };
-              };
-          }
+            response?: {
+                status?: number;
+                data?: { message?: string };
+            };
+        }
         | null;
 
     const handleError = (err: unknown) => {
@@ -218,6 +230,36 @@ function ProductCard({ product }: { product: ProductI }) {
 
         if (status === 401) {
             router.push("/user/login");
+        }
+    };
+
+    // Get wishlist items.
+    // Assumes GET /api/wishlist returns { items: [...] }.
+    const wishlistItems: WishlistItemI[] =
+        wishlistData?.data?.items ?? [];
+
+    // Find existing wishlist item using vendor listing ID.
+    const existingWishlistItem = wishlistItems.find(
+        (item) => item.listingId === product.listingId
+    );
+
+    const isWishlisted = !!existingWishlistItem;
+
+    // Add or remove wishlist item.
+    const handleWishlistToggle = () => {
+        if (!isVendorProduct || !product.listingId) return;
+
+        if (existingWishlistItem) {
+            removeFromWishlist.mutate(
+                existingWishlistItem.wishlistItemId,
+                {
+                    onError: handleError,
+                }
+            );
+        } else {
+            addToWishlist.mutate(product.listingId, {
+                onError: handleError,
+            });
         }
     };
 
@@ -259,50 +301,82 @@ function ProductCard({ product }: { product: ProductI }) {
         <article
             className={`${cardCls} group flex flex-col overflow-hidden transition-all duration-300 hover:-translate-y-1 hover:shadow-[0_28px_70px_-20px_rgba(15,23,42,0.3)]`}
         >
-            <Link
-                href={href}
-                className="relative block aspect-square overflow-hidden focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-amber-400"
-            >
-                <div
-                    className={`absolute inset-0 bg-gradient-to-br ${toneFor(product.productId)}`}
+            {/* Product image and wishlist button */}
+            <div className="relative">
+                <Link
+                    href={href}
+                    className="relative block aspect-square overflow-hidden focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-amber-400"
                 >
-                    {product.imageUrl ? (
-                        // eslint-disable-next-line @next/next/no-img-element
-                        <img
-                            src={product.imageUrl}
-                            alt={product.name}
-                            loading="lazy"
-                            className={`h-full w-full object-cover transition-transform duration-500 group-hover:scale-105 ${
-                                outOfStock
-                                    ? "opacity-60 grayscale"
-                                    : ""
-                            }`}
-                        />
-                    ) : (
-                        <div className="grid h-full w-full place-items-center text-amber-200/40 transition-transform duration-500 group-hover:scale-110">
-                            <GemIcon className="h-16 w-16 sm:h-20 sm:w-20" />
-                        </div>
-                    )}
-                </div>
+                    <div
+                        className={`absolute inset-0 bg-gradient-to-br ${toneFor(product.productId)}`}
+                    >
+                        {product.imageUrl ? (
+                            // eslint-disable-next-line @next/next/no-img-element
+                            <img
+                                src={product.imageUrl}
+                                alt={product.name}
+                                loading="lazy"
+                                className={`h-full w-full object-cover transition-transform duration-500 group-hover:scale-105 ${outOfStock
+                                        ? "opacity-60 grayscale"
+                                        : ""
+                                    }`}
+                            />
+                        ) : (
+                            <div className="grid h-full w-full place-items-center text-amber-200/40 transition-transform duration-500 group-hover:scale-110">
+                                <GemIcon className="h-16 w-16 sm:h-20 sm:w-20" />
+                            </div>
+                        )}
+                    </div>
 
-                <div className="pointer-events-none absolute inset-x-0 bottom-0 h-1/3 bg-gradient-to-t from-slate-950/40 to-transparent" />
+                    <div className="pointer-events-none absolute inset-x-0 bottom-0 h-1/3 bg-gradient-to-t from-slate-950/40 to-transparent" />
 
-                <div className="absolute left-3 top-3 flex flex-col items-start gap-1.5">
-                    {outOfStock ? (
-                        <span className="rounded-full bg-slate-950/85 px-3 py-1 text-[11px] font-semibold text-white backdrop-blur">
-                            Sold out
-                        </span>
-                    ) : lowStock ? (
-                        <span className="rounded-full bg-gradient-to-br from-amber-200 to-amber-400 px-3 py-1 text-[11px] font-semibold text-slate-950">
-                            Only {product.stock} left
-                        </span>
-                    ) : null}
-                </div>
+                    <div className="absolute left-3 top-3 flex flex-col items-start gap-1.5">
+                        {outOfStock ? (
+                            <span className="rounded-full bg-slate-950/85 px-3 py-1 text-[11px] font-semibold text-white backdrop-blur">
+                                Sold out
+                            </span>
+                        ) : lowStock ? (
+                            <span className="rounded-full bg-gradient-to-br from-amber-200 to-amber-400 px-3 py-1 text-[11px] font-semibold text-slate-950">
+                                Only {product.stock} left
+                            </span>
+                        ) : null}
+                    </div>
 
-                <span className="absolute right-3 top-3 rounded-full bg-white/85 px-2.5 py-1 text-[11px] font-medium text-slate-700 backdrop-blur">
-                    {product.categoryName}
-                </span>
-            </Link>
+                    <span className="absolute right-3 top-3 rounded-full bg-white/85 px-2.5 py-1 text-[11px] font-medium text-slate-700 backdrop-blur">
+                        {product.categoryName}
+                    </span>
+                </Link>
+
+                {/* Wishlist button */}
+                <button
+                    type="button"
+                    onClick={handleWishlistToggle}
+                    disabled={
+                        addToWishlist.isPending ||
+                        removeFromWishlist.isPending
+                    }
+                    aria-label={
+                        isWishlisted
+                            ? `Remove ${product.name} from wishlist`
+                            : `Add ${product.name} to wishlist`
+                    }
+                    title={
+                        isWishlisted
+                            ? "Remove from wishlist"
+                            : "Add to wishlist"
+                    }
+                    className="absolute right-3 top-12 z-10 flex h-10 w-10 items-center justify-center rounded-full bg-white/95 shadow-md transition hover:scale-110 hover:bg-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-400 disabled:cursor-not-allowed disabled:opacity-50"
+                >
+                    <Heart
+                        size={20}
+                        className={
+                            isWishlisted
+                                ? "fill-red-500 text-red-500"
+                                : "text-slate-500"
+                        }
+                    />
+                </button>
+            </div>
 
             <div className="flex flex-1 flex-col p-4 sm:p-5">
                 <p className="flex items-center gap-1.5 text-xs text-slate-500">
@@ -346,8 +420,8 @@ function ProductCard({ product }: { product: ProductI }) {
                         {addToCart.isPending
                             ? "Adding…"
                             : addToCart.isSuccess
-                              ? "Added"
-                              : "Add to cart"}
+                                ? "Added"
+                                : "Add to cart"}
                     </button>
 
                     <button
@@ -361,16 +435,21 @@ function ProductCard({ product }: { product: ProductI }) {
                     </button>
                 </div>
 
-                {addToCart.isError && cartError?.response?.status !== 401 && (
-                    <p role="alert" className="mt-2 text-xs text-rose-600">
-                        {cartError?.response?.data?.message ??
-                            "Could not add to cart."}
-                    </p>
-                )}
+                {addToCart.isError &&
+                    cartError?.response?.status !== 401 && (
+                        <p
+                            role="alert"
+                            className="mt-2 text-xs text-rose-600"
+                        >
+                            {cartError?.response?.data?.message ??
+                                "Could not add to cart."}
+                        </p>
+                    )}
             </div>
         </article>
     );
 }
+
 
 
 function ProductSkeleton() {
@@ -436,11 +515,10 @@ function Pagination({
                         type="button"
                         onClick={() => onChange(p)}
                         aria-current={p === page ? "page" : undefined}
-                        className={`${base} ${
-                            p === page
-                                ? "bg-slate-950 text-amber-300 ring-slate-950"
-                                : "bg-white text-slate-700 ring-slate-200 hover:bg-slate-50"
-                        }`}
+                        className={`${base} ${p === page
+                            ? "bg-slate-950 text-amber-300 ring-slate-950"
+                            : "bg-white text-slate-700 ring-slate-200 hover:bg-slate-50"
+                            }`}
                     >
                         {p}
                     </button>
@@ -518,11 +596,6 @@ export default function ShopPage() {
         placeholderData: keepPreviousData,
     });
 
-    /*
-     * IMPORTANT:
-     * Only vendor products with a valid listingId are displayed.
-     * Admin products have no vendor listingId and are excluded.
-     */
     const allProducts: ProductI[] = Array.isArray(data?.data)
         ? data.data
         : [];
@@ -615,7 +688,6 @@ export default function ShopPage() {
                         className="grid gap-3 md:grid-cols-[1fr_16rem]"
                         role="search"
                     >
-                        {/* search */}
                         <div className="relative">
                             <label htmlFor="shop-search" className="sr-only">
                                 Search products
@@ -636,7 +708,6 @@ export default function ShopPage() {
                             />
                         </div>
 
-                        {/* sort */}
                         <div className="relative">
                             <label htmlFor="shop-sort" className="sr-only">
                                 Sort products
@@ -663,7 +734,6 @@ export default function ShopPage() {
                         </div>
                     </form>
 
-                    {/* category chips */}
                     <div
                         className="-mx-1 mt-4 flex gap-2 overflow-x-auto px-1 pb-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
                         role="group"
@@ -683,11 +753,10 @@ export default function ShopPage() {
                                                 shouldDirty: true,
                                             })
                                         }
-                                        className={`shrink-0 rounded-full px-4 py-2 text-sm font-medium transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-400 ${
-                                            active
-                                                ? "bg-slate-950 text-amber-300 shadow-md shadow-slate-950/20"
-                                                : "bg-slate-100 text-slate-700 hover:bg-slate-200"
-                                        }`}
+                                        className={`shrink-0 rounded-full px-4 py-2 text-sm font-medium transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-400 ${active
+                                            ? "bg-slate-950 text-amber-300 shadow-md shadow-slate-950/20"
+                                            : "bg-slate-100 text-slate-700 hover:bg-slate-200"
+                                            }`}
                                     >
                                         {c.name}
                                     </button>
@@ -703,7 +772,6 @@ export default function ShopPage() {
                 ref={gridTopRef}
                 className="mx-auto mt-10 max-w-7xl scroll-mt-24 px-4 sm:px-6 lg:px-8"
             >
-                {/* summary row */}
                 <div className="flex flex-wrap items-center justify-between gap-3">
                     <p className="text-sm text-slate-600" aria-live="polite">
                         {isPending ? (
@@ -752,9 +820,8 @@ export default function ShopPage() {
                 </div>
 
                 <div
-                    className={`mt-6 transition-opacity duration-200 ${
-                        isFetching && !isPending ? "opacity-60" : "opacity-100"
-                    }`}
+                    className={`mt-6 transition-opacity duration-200 ${isFetching && !isPending ? "opacity-60" : "opacity-100"
+                        }`}
                 >
                     {isPending ? (
                         <div className="grid grid-cols-2 gap-4 sm:gap-5 lg:grid-cols-3 xl:grid-cols-4">
@@ -824,15 +891,16 @@ export default function ShopPage() {
                         </div>
                     )}
                 </div>
-
-                {!isError && (
-                    <Pagination
-                        page={pagination.page}
-                        totalPages={pagination.totalPages}
-                        onChange={goToPage}
-                    />
-                )}
             </section>
+
+            {!isError && (
+                <Pagination
+                    page={pagination.page}
+                    totalPages={pagination.totalPages}
+                    onChange={goToPage}
+                />
+            )}
         </div>
     );
 }
+

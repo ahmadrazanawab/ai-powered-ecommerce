@@ -1,3 +1,4 @@
+// path: app/api/lib/schema/vendor-product-schema.ts
 import {
   pgTable,
   uuid,
