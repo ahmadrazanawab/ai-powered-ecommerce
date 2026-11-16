@@ -89,7 +89,7 @@ const Page = () => {
     const vendorSignupMutation = useMutation({
         mutationFn: async (data: VendorSignupI) => {
             const res = await api.post("/api/auth/vendor/signup", data);
-            router.push("/pending-approval-vendor")
+            router.push("/vendor/pending-approval-vendor")
             return res.data;
         },
 

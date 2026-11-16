@@ -579,7 +579,7 @@ function ProductDetailContent() {
                                         Please{" "}
 
                                         <Link
-                                            href="/user/login"
+                                            href="/user/auth-user"
                                             className="font-semibold underline underline-offset-4"
                                         >
                                             log in
