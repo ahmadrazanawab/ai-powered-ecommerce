@@ -1,4 +1,4 @@
-// FILE: app/api/products/[slug]/route.ts
+// FILE: app/api/products/product_details/[slug]/route.ts
 // GET: one product (by slug) + all approved vendor offers for it
 
 import { NextRequest, NextResponse } from "next/server";
@@ -8,6 +8,7 @@ import { categorySchema } from "../../../lib/schema/category-schema";
 import { and, eq, asc } from "drizzle-orm";
 import { vendors } from "../../../lib/schema/vendor";
 import { vendorProductSchema } from "../../../lib/schema/vendor-product-schema";
+import { effectiveDescription } from "@/app/api/lib/schema/resolve-description";
 export async function GET(
     _request: NextRequest,
     { params }: { params: Promise<{ slug: string }> } // Next.js 15: params is a Promise
@@ -44,7 +45,6 @@ export async function GET(
             );
         }
 
-        // 2. Approved vendor offers for this product (cheapest first)
         const offers = await db
             .select({
                 listingId: vendorProductSchema.id,
@@ -52,8 +52,13 @@ export async function GET(
                 vendorName: vendors.name,
                 price: vendorProductSchema.price,
                 stock: vendorProductSchema.stock,
+                description: effectiveDescription,   // ADD
             })
             .from(vendorProductSchema)
+            .innerJoin(
+                productSchema,                        // ADD
+                eq(vendorProductSchema.productId, productSchema.id)
+            )
             .innerJoin(vendors, eq(vendorProductSchema.vendorId, vendors.id))
             .where(
                 and(
@@ -64,6 +69,27 @@ export async function GET(
                 )
             )
             .orderBy(asc(vendorProductSchema.price));
+
+        // 2. Approved vendor offers for this product (cheapest first)
+        // const offers = await db
+        //     .select({
+        //         listingId: vendorProductSchema.id,
+        //         vendorId: vendors.id,
+        //         vendorName: vendors.name,
+        //         price: vendorProductSchema.price,
+        //         stock: vendorProductSchema.stock,
+        //     })
+        //     .from(vendorProductSchema)
+        //     .innerJoin(vendors, eq(vendorProductSchema.vendorId, vendors.id))
+        //     .where(
+        //         and(
+        //             eq(vendorProductSchema.productId, product.productId),
+        //             eq(vendorProductSchema.isActive, true),
+        //             eq(vendors.status, "approved"),
+        //             eq(vendors.isActive, true)
+        //         )
+        //     )
+        //     .orderBy(asc(vendorProductSchema.price));
 
         return NextResponse.json(
             {

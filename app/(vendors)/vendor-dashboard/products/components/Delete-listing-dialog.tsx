@@ -1,4 +1,4 @@
-// FILE: app/components/vendor/delete-listing-dialog.tsx
+// FILE: app/(vendors)/vendor/products/components/vendor/delete-listing-dialog.tsx
 "use client";
 
 import { useEffect, useRef } from "react";

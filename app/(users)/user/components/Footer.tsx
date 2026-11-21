@@ -15,8 +15,8 @@ const footerColumns = [
     {
         title: "Account",
         links: [
-            { label: "Log in", href: "/user/login" },
-            { label: "Sign up", href: "/user/signup" },
+            { label: "Log in", href: "/user/auth-user" },
+            { label: "Sign up", href: "/user/auth-user" },
             { label: "My orders", href: "/user/orders" },
         ],
     },

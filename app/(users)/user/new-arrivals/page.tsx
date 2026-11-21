@@ -216,7 +216,7 @@ function useProductActions(product: ProductI) {
         const status = (err as { response?: { status?: number } })?.response
             ?.status;
 
-        if (status === 401) router.push("/user/login");
+        if (status === 401) router.push("/user/auth-user");
     };
 
     const payload = {

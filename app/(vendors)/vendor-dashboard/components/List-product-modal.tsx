@@ -17,6 +17,7 @@ const LISTING_ENDPOINT = "/api/auth/vendor/vendor-product";
 interface FormValues {
     price: number;
     stock: number;
+    description: string;
     isActive?: boolean;
 }
 
@@ -38,17 +39,30 @@ export default function ListProductModal({ product, categoryName, onClose }: Pro
         handleSubmit,
         setFocus,
         formState: { errors },
-    } = useForm<FormValues>({ defaultValues: { stock: 1 } });
+    } = useForm<FormValues>({ defaultValues: { stock: 1, description: "" } });
 
     const mutation = useMutation({
-        mutationFn: async (values: FormValues) =>
-            (
+        mutationFn: async (values: FormValues) => {
+            const description = values.description.trim();
+
+            return (
                 await api.post(LISTING_ENDPOINT, {
                     productId: product.id,
                     price: values.price,
-                    stock: values.stock, 
+                    stock: values.stock,
+                    ...(description ? { description } : {}), // ADD: omitted when empty
                 })
-            ).data,
+            ).data;
+        },
+        // mutationFn: async (values: FormValues) =>
+        //     (
+        //         await api.post(LISTING_ENDPOINT, {
+        //             productId: product.id,
+        //             price: values.price,
+        //             stock: values.stock,
+        //             ...(description ? { description } : {}),
+        //         })
+        //     ).data,
         onSuccess: () => {
             // refresh the "My listings" page data
             queryClient.invalidateQueries({ queryKey: ["vendor-listings"] });
@@ -184,6 +198,31 @@ export default function ListProductModal({ product, categoryName, onClose }: Pro
                                 )}
                             </div>
 
+                            {/* description (optional) */}
+                            <div>
+                                <label htmlFor="listing-description" className="text-sm font-medium text-slate-900">
+                                    Description <span className="font-normal text-slate-500">(optional)</span>
+                                </label>
+                                <textarea
+                                    id="listing-description"
+                                    rows={4}
+                                    placeholder={product.description ?? "Add your own description"}
+                                    aria-invalid={Boolean(errors.description)}
+                                    className={`${fieldCls} mt-2 h-auto px-4 py-3`}
+                                    {...register("description", {
+                                        maxLength: { value: 5000, message: "Use 5000 characters or less" },
+                                    })}
+                                />
+                                {errors.description ? (
+                                    <p role="alert" className="mt-1.5 text-xs text-rose-600">
+                                        {errors.description.message}
+                                    </p>
+                                ) : (
+                                    <p className="mt-1.5 text-xs text-slate-500">
+                                        Leave empty to show the default product description.
+                                    </p>
+                                )}
+                            </div>
                             {/* stock */}
                             <div>
                                 <label htmlFor="listing-stock" className="text-sm font-medium text-slate-900">

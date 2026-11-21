@@ -1,4 +1,4 @@
-
+// file path : app/api/vendor/products/route.ts
 import { NextRequest, NextResponse } from "next/server";
 import { and, eq, desc } from "drizzle-orm";
 
@@ -8,6 +8,7 @@ import { vendorProductSchema } from "@/app/api/lib/schema/vendor-product-schema"
 import { vendors } from "@/app/api/lib/schema/vendor";
 import { categorySchema } from "@/app/api/lib/schema/category-schema";
 import { verifyVendorToken } from "../verify-token-vendor";
+import { effectiveDescription } from "@/app/api/lib/schema/resolve-description";
 
 export const runtime = "nodejs";
 
@@ -55,7 +56,9 @@ export async function GET(req: NextRequest) {
                 name: productSchema.name,
                 slug: productSchema.slug,
                 sku: productSchema.sku,
-                description: productSchema.description,
+                description: effectiveDescription,                    // what users see
+                adminDescription: productSchema.description,          // default, for display in the vendor form
+                vendorDescription: vendorProductSchema.description,   // vendor's own override (null if none)
                 imageUrl: productSchema.imageUrl,
 
                 // Vendor-specific information

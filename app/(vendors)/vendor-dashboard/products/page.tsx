@@ -1,4 +1,4 @@
-// FILE: app/(vendors)/vendor-dashbaord/products/page.tsx
+// FILE: app/(vendors)/vendor/vendor-dashbaord/products/page.tsx
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
@@ -156,7 +156,7 @@ export default function VendorListingsPage() {
                     </p>
                 </div>
 
-                <Link href="/vendor-dashbaord/catalog" className={`${goldBtn} w-full sm:w-auto`}>
+                <Link href="/vendor-dashboard/catalog" className={`${goldBtn} w-full sm:w-auto`}>
                     <Svg className="mr-2 h-4 w-4" strokeWidth={2}>
                         <path d="M12 5v14M5 12h14" />
                     </Svg>
@@ -268,7 +268,7 @@ export default function VendorListingsPage() {
                         <p className="mt-2 text-sm text-slate-600">
                             Pick a product from the catalog and set your own price and stock.
                         </p>
-                        <Link href="/vendor-dashbaord/catalog" className={`${goldBtn} mt-6`}>
+                        <Link href="/vendor-dashboard/catalog" className={`${goldBtn} mt-6`}>
                             Browse catalog
                         </Link>
                     </div>

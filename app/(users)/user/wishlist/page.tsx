@@ -197,7 +197,7 @@ function WishlistCard({
     const handleError = (err: unknown) => {
         const status = (err as { response?: { status?: number } })?.response
             ?.status;
-        if (status === 401) router.push("/user/login");
+        if (status === 401) router.push("/user/auth-user");
     };
 
     const payload = {
@@ -439,7 +439,7 @@ export default function WishlistPage() {
         )?.response?.status;
 
         if (status === 401) {
-            router.push("/user/login");
+            router.push("/user/auth-user");
         }
     }, [remove.error, router]);
 
@@ -526,7 +526,7 @@ export default function WishlistPage() {
                     ?.response?.status;
 
                 if (status === 401) {
-                    router.push("/user/login");
+                    router.push("/user/auth-user");
                     setBulk({ running: false, message: null });
                     return;
                 }

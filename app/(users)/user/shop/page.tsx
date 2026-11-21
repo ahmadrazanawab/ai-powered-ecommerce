@@ -229,7 +229,7 @@ function ProductCard({ product }: { product: ProductI }) {
         )?.response?.status;
 
         if (status === 401) {
-            router.push("/user/login");
+            router.push("/user/auth-user");
         }
     };
 

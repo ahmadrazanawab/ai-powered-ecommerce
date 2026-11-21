@@ -1,3 +1,4 @@
+// file path : app/products/[productId]/route.ts
 import { NextResponse, NextRequest } from "next/server";
 import { eq, and } from "drizzle-orm";
 
@@ -8,6 +9,8 @@ import { verifyAdminToken } from "../../auth/admin/verify-token";
 import { categorySchema } from "@/app/api/lib/schema/category-schema";
 import { vendors } from "@/app/api/lib/schema/vendor";
 import { vendorProductSchema } from "@/app/api/lib/schema/vendor-product-schema";
+import { effectiveDescription } from "../../lib/schema/resolve-description";
+
 
 export async function PUT(
     req: NextRequest,
@@ -270,7 +273,6 @@ export async function GET(
             );
         }
 
-        // Fetch offers from approved and active vendors
         const offers = await db
             .select({
                 listingId: vendorProductSchema.id,
@@ -278,12 +280,14 @@ export async function GET(
                 vendorName: vendors.name,
                 price: vendorProductSchema.price,
                 stock: vendorProductSchema.stock,
+                description: effectiveDescription,   // ADD
             })
             .from(vendorProductSchema)
             .innerJoin(
-                vendors,
-                eq(vendorProductSchema.vendorId, vendors.id)
+                productSchema,                        // ADD
+                eq(vendorProductSchema.productId, productSchema.id)
             )
+            .innerJoin(vendors, eq(vendorProductSchema.vendorId, vendors.id))
             .where(
                 and(
                     eq(vendorProductSchema.productId, productId),
@@ -293,6 +297,32 @@ export async function GET(
                 )
             )
             .orderBy(vendorProductSchema.price);
+
+
+
+        // Fetch offers from approved and active vendors
+        // const offers = await db
+        //     .select({
+        //         listingId: vendorProductSchema.id,
+        //         vendorId: vendors.id,
+        //         vendorName: vendors.name,
+        //         price: vendorProductSchema.price,
+        //         stock: vendorProductSchema.stock,
+        //     })
+        //     .from(vendorProductSchema)
+        //     .innerJoin(
+        //         vendors,
+        //         eq(vendorProductSchema.vendorId, vendors.id)
+        //     )
+        //     .where(
+        //         and(
+        //             eq(vendorProductSchema.productId, productId),
+        //             eq(vendorProductSchema.isActive, true),
+        //             eq(vendors.status, "approved"),
+        //             eq(vendors.isActive, true)
+        //         )
+        //     )
+        //     .orderBy(vendorProductSchema.price);
 
         // A catalog product without eligible offers is not purchasable
         if (offers.length === 0) {

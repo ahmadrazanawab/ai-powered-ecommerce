@@ -587,7 +587,7 @@ export default function CustomerOrdersPage() {
     useEffect(() => {
         const code = (error as { response?: { status?: number } } | null)
             ?.response?.status;
-        if (code === 401) router.push("/user/login");
+        if (code === 401) router.push("/user/auth-user");
     }, [error, router]);
 
     // back to page 1 whenever the filter changes

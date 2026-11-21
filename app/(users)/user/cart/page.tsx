@@ -178,7 +178,7 @@ export default function CartPage() {
                 <div className={`${cardCls} mx-auto mt-10 max-w-lg p-10 text-center`}>
                     <h2 className="text-lg font-semibold text-slate-900">Please log in</h2>
                     <p className="mt-2 text-sm text-slate-600">Log in to see your cart.</p>
-                    <Link href="/user/login" className={`${goldBtn} mt-6`}>Log in</Link>
+                    <Link href="/user/auth-user" className={`${goldBtn} mt-6`}>Log in</Link>
                 </div>
             ) : isError ? (
                 <div className={`${cardCls} mx-auto mt-10 max-w-lg p-10 text-center`}>

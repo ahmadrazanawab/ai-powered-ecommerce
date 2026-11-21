@@ -1,4 +1,4 @@
-
+// file path : app/api/products/route.ts
 import { NextRequest, NextResponse } from "next/server";
 import {
     eq, and,
@@ -18,7 +18,7 @@ import { uploadImageToCloudinary } from "../lib/cloudinary";
 import { categorySchema } from "@/app/api/lib/schema/category-schema";
 import { vendors } from "@/app/api/lib/schema/vendor";
 import { vendorProductSchema } from "@/app/api/lib/schema/vendor-product-schema";
-
+import { effectiveDescription } from "../lib/schema/resolve-description";
 
 export const runtime = "nodejs";
 
@@ -264,6 +264,7 @@ export async function GET(request: NextRequest) {
         // 8. Fetch approved vendor offers for these products
         const productIds = products.map((product) => product.productId);
 
+
         const offers =
             productIds.length > 0
                 ? await db
@@ -274,8 +275,13 @@ export async function GET(request: NextRequest) {
                         vendorName: vendors.name,
                         price: vendorProductSchema.price,
                         stock: vendorProductSchema.stock,
+                        description: effectiveDescription, // vendor's, else admin's
                     })
                     .from(vendorProductSchema)
+                    .innerJoin(
+                        productSchema,
+                        eq(vendorProductSchema.productId, productSchema.id)
+                    )
                     .innerJoin(
                         vendors,
                         eq(vendorProductSchema.vendorId, vendors.id)
@@ -290,6 +296,33 @@ export async function GET(request: NextRequest) {
                     )
                     .orderBy(asc(vendorProductSchema.price))
                 : [];
+
+        // const offers =
+        //     productIds.length > 0
+        //         ? await db
+        //             .select({
+        //                 listingId: vendorProductSchema.id,
+        //                 productId: vendorProductSchema.productId,
+        //                 vendorId: vendors.id,
+        //                 vendorName: vendors.name,
+        //                 price: vendorProductSchema.price,
+        //                 stock: vendorProductSchema.stock,
+        //             })
+        //             .from(vendorProductSchema)
+        //             .innerJoin(
+        //                 vendors,
+        //                 eq(vendorProductSchema.vendorId, vendors.id)
+        //             )
+        //             .where(
+        //                 and(
+        //                     inArray(vendorProductSchema.productId, productIds),
+        //                     eq(vendorProductSchema.isActive, true),
+        //                     eq(vendors.status, "approved"),
+        //                     eq(vendors.isActive, true)
+        //                 )
+        //             )
+        //             .orderBy(asc(vendorProductSchema.price))
+        //         : [];
 
         // 9. Group vendor offers by product
         const offersMap = new Map<string, typeof offers>();
@@ -316,6 +349,7 @@ export async function GET(request: NextRequest) {
             // Vendor listings of the same product
             const vendorItems = productOffers.map((offer) => ({
                 ...product,
+                description: offer.description,   // ADD
                 listingId: offer.listingId,
                 price: offer.price,
                 stock: offer.stock,
@@ -323,6 +357,16 @@ export async function GET(request: NextRequest) {
                 vendorName: offer.vendorName,
                 source: "vendor" as const,
             }));
+
+            // const vendorItems = productOffers.map((offer) => ({
+            //     ...product,
+            //     listingId: offer.listingId,
+            //     price: offer.price,
+            //     stock: offer.stock,
+            //     vendorId: offer.vendorId,
+            //     vendorName: offer.vendorName,
+            //     source: "vendor" as const,
+            // }));
 
             return [adminItem, ...vendorItems];
         });
@@ -357,174 +401,3 @@ export async function GET(request: NextRequest) {
     }
 }
 
-
-
-
-
-
-
-
-// export async function GET(request: NextRequest) {
-//     try {
-//         const { searchParams } = new URL(request.url);
-
-//         // Search and filters
-//         const search = searchParams.get("search")?.trim();
-//         const categoryId = searchParams.get("categoryId");
-
-//         // Pagination
-//         const page = Math.max(
-//             1,
-//             Number.parseInt(searchParams.get("page") || "1", 10) || 1
-//         );
-
-//         const limit = Math.min(
-//             100,
-//             Math.max(
-//                 1,
-//                 Number.parseInt(searchParams.get("limit") || "12", 10) || 12
-//             )
-//         );
-
-//         const offset = (page - 1) * limit;
-
-//         // Sorting
-//         const sortBy = searchParams.get("sortBy") || "newest";
-//         const sortOrder = searchParams.get("sortOrder") || "desc";
-
-//         if (
-//             !["name", "price", "newest"].includes(sortBy) ||
-//             !["asc", "desc"].includes(sortOrder)
-//         ) {
-//             return NextResponse.json(
-//                 {
-//                     success: false,
-//                     message: "Invalid sorting parameters",
-//                 },
-//                 { status: 400 }
-//             );
-//         }
-
-//         // Customer visibility rules
-//         const conditions = [
-//             eq(productSchema.isActive, true),
-//             eq(vendorProductSchema.isActive, true),
-//             eq(vendors.status, "approved"),
-//             eq(vendors.isActive, true),
-//         ];
-
-//         if (categoryId) {
-//             conditions.push(eq(productSchema.categoryId, categoryId));
-//         }
-
-//         if (search) {
-//             const searchPattern = `%${search}%`;
-
-//             conditions.push(
-//                 or(
-//                     ilike(productSchema.name, searchPattern),
-//                     ilike(productSchema.slug, searchPattern),
-//                     ilike(productSchema.description, searchPattern),
-//                     ilike(categorySchema.name, searchPattern)
-//                 )!
-//             );
-//         }
-
-//         const whereCondition = and(...conditions);
-
-//         // Total number of eligible offers matching the filters
-//         const [totalResult] = await db
-//             .select({ total: count() })
-//             .from(vendorProductSchema)
-//             .innerJoin(
-//                 productSchema,
-//                 eq(vendorProductSchema.productId, productSchema.id)
-//             )
-//             .innerJoin(
-//                 vendors,
-//                 eq(vendorProductSchema.vendorId, vendors.id)
-//             )
-//             .innerJoin(
-//                 categorySchema,
-//                 eq(productSchema.categoryId, categorySchema.id)
-//             )
-//             .where(whereCondition);
-
-//         // Sorting uses the vendor's offer price, not the catalog price
-//         const orderBy =
-//             sortBy === "name"
-//                 ? sortOrder === "asc"
-//                     ? asc(productSchema.name)
-//                     : desc(productSchema.name)
-//                 : sortBy === "price"
-//                     ? sortOrder === "asc"
-//                         ? asc(vendorProductSchema.price)
-//                         : desc(vendorProductSchema.price)
-//                     : sortOrder === "asc"
-//                         ? asc(productSchema.createdAt)
-//                         : desc(productSchema.createdAt);
-
-//         // Fetch offers available to customers
-//         const products = await db
-//             .select({
-//                 listingId: vendorProductSchema.id,
-//                 productId: productSchema.id,
-//                 name: productSchema.name,
-//                 slug: productSchema.slug,
-//                 description: productSchema.description,
-//                 imageUrl: productSchema.imageUrl,
-//                 categoryId: categorySchema.id,
-//                 categoryName: categorySchema.name,
-
-//                 // Vendor-specific values
-//                 price: vendorProductSchema.price,
-//                 stock: vendorProductSchema.stock,
-//                 vendorId: vendors.id,
-//                 vendorName: vendors.name,
-//             })
-//             .from(vendorProductSchema)
-//             .innerJoin(
-//                 productSchema,
-//                 eq(vendorProductSchema.productId, productSchema.id)
-//             )
-//             .innerJoin(
-//                 vendors,
-//                 eq(vendorProductSchema.vendorId, vendors.id)
-//             )
-//             .innerJoin(
-//                 categorySchema,
-//                 eq(productSchema.categoryId, categorySchema.id)
-//             )
-//             .where(whereCondition)
-//             .orderBy(orderBy)
-//             .limit(limit)
-//             .offset(offset);
-
-//         const total = Number(totalResult?.total ?? 0);
-
-//         return NextResponse.json(
-//             {
-//                 success: true,
-//                 message: "Products fetched successfully",
-//                 data: products,
-//                 pagination: {
-//                     page,
-//                     limit,
-//                     total,
-//                     totalPages: Math.ceil(total / limit),
-//                 },
-//             },
-//             { status: 200 }
-//         );
-//     } catch (error) {
-//         console.error("GET_CUSTOMER_PRODUCTS_ERROR:", error);
-
-//         return NextResponse.json(
-//             {
-//                 success: false,
-//                 message: "Failed to fetch products",
-//             },
-//             { status: 500 }
-//         );
-//     }
-// }

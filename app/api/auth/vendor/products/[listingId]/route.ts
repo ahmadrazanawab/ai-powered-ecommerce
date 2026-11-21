@@ -1,4 +1,4 @@
-
+// file path : app/api/vendor/products/[listingId]/route.ts
 import { NextRequest, NextResponse } from "next/server";
 import { and, eq } from "drizzle-orm";
 
@@ -86,14 +86,14 @@ export async function PUT(
         }
 
         const input = body as Record<string, unknown>;
-        const allowedFields = ["price", "stock", "isActive"];
+        const allowedFields = ["price", "stock", "description", "isActive"];
 
         // Reject unexpected fields such as vendorId or productId
         if (Object.keys(input).some((key) => !allowedFields.includes(key))) {
             return NextResponse.json(
                 {
                     success: false,
-                    message: "Only price, stock, and isActive can be updated",
+                    message: "Only price, stock, description, and isActive can be updated",
                 },
                 { status: 400 }
             );
@@ -112,6 +112,7 @@ export async function PUT(
         // 5. Validate and build partial update
         const updateData: {
             price?: string;
+            description?: string | null;
             stock?: number;
             isActive?: boolean;
             updatedAt: Date;
@@ -170,6 +171,33 @@ export async function PUT(
             }
 
             updateData.stock = input.stock;
+        }
+
+        if (Object.hasOwn(input, "description")) {
+            const rawDescription = input.description;
+
+            if (rawDescription !== null && typeof rawDescription !== "string") {
+                return NextResponse.json(
+                    { success: false, message: "Description must be a string or null" },
+                    { status: 400 }
+                );
+            }
+
+            const trimmed =
+                typeof rawDescription === "string" ? rawDescription.trim() : "";
+
+            if (trimmed.length > 5000) {
+                return NextResponse.json(
+                    {
+                        success: false,
+                        message: "Description must be 5000 characters or less",
+                    },
+                    { status: 400 }
+                );
+            }
+
+            // Empty or null = no vendor description, so users see the admin default
+            updateData.description = trimmed === "" ? null : trimmed;
         }
 
         if (Object.hasOwn(input, "isActive")) {

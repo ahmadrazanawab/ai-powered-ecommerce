@@ -1,4 +1,4 @@
-// FILE: app/components/vendor/listing-card.tsx
+// FILE: app/(vendors)/vendor/products/components/vendor/listing-card.tsx
 "use client";
 
 import {
@@ -17,7 +17,9 @@ export interface VendorListingI {
     name: string;
     slug: string;
     sku: string | null;
-    description: string | null;
+    description: string | null;          // what customers see (resolved)
+    adminDescription: string | null;     // ADD: catalog default
+    vendorDescription: string | null;    // ADD: vendor's own override
     imageUrl: string | null;
     price: string | number;
     stock: number;
@@ -52,17 +54,15 @@ export default function ListingCard({ listing, busy, onToggle, onEdit, onDelete 
 
     return (
         <article
-            className={`${cardCls} p-4 transition-all sm:p-5 ${
-                listing.isActive ? "" : "bg-slate-50/70"
-            } ${busy ? "opacity-70" : ""}`}
+            className={`${cardCls} p-4 transition-all sm:p-5 ${listing.isActive ? "" : "bg-slate-50/70"
+                } ${busy ? "opacity-70" : ""}`}
         >
             <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:gap-6">
                 {/* product */}
                 <div className="flex min-w-0 flex-1 items-center gap-4">
                     <div
-                        className={`grid h-20 w-20 shrink-0 place-items-center overflow-hidden rounded-2xl bg-gradient-to-br from-slate-900 to-indigo-900 text-amber-200/50 sm:h-24 sm:w-24 ${
-                            listing.isActive ? "" : "grayscale"
-                        }`}
+                        className={`grid h-20 w-20 shrink-0 place-items-center overflow-hidden rounded-2xl bg-gradient-to-br from-slate-900 to-indigo-900 text-amber-200/50 sm:h-24 sm:w-24 ${listing.isActive ? "" : "grayscale"
+                            }`}
                     >
                         {listing.imageUrl ? (
                             // eslint-disable-next-line @next/next/no-img-element
@@ -126,16 +126,14 @@ export default function ListingCard({ listing, busy, onToggle, onEdit, onDelete 
                             aria-label={`${listing.isActive ? "Hide" : "Show"} ${listing.name} in the store`}
                             disabled={busy}
                             onClick={() => onToggle(listing)}
-                            className={`relative h-6 w-11 shrink-0 rounded-full transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-400 focus-visible:ring-offset-2 disabled:cursor-not-allowed ${
-                                listing.isActive ? "bg-slate-950" : "bg-slate-300"
-                            }`}
+                            className={`relative h-6 w-11 shrink-0 rounded-full transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-400 focus-visible:ring-offset-2 disabled:cursor-not-allowed ${listing.isActive ? "bg-slate-950" : "bg-slate-300"
+                                }`}
                         >
                             <span
-                                className={`absolute left-0.5 top-0.5 h-5 w-5 rounded-full shadow transition-transform ${
-                                    listing.isActive
+                                className={`absolute left-0.5 top-0.5 h-5 w-5 rounded-full shadow transition-transform ${listing.isActive
                                         ? "translate-x-5 bg-amber-300"
                                         : "translate-x-0 bg-white"
-                                }`}
+                                    }`}
                             />
                         </button>
                         <span className="text-xs font-medium text-slate-600">

@@ -1,4 +1,4 @@
-// FILE: app/components/vendor/edit-listing-modal.tsx
+// FILE: app/(vendors)/vendor/products/components/vendor/edit-listing-modal.tsx
 "use client";
 
 import { useEffect, useRef } from "react";
@@ -11,11 +11,13 @@ import type { VendorListingI } from "./Listing-card";
 interface FormValues {
     price: string; // kept as text: the API accepts up to 2 decimals
     stock: number;
+    description: string;
 }
 
 interface UpdateBody {
     price?: string;
     stock?: number;
+    description?: string; // ADD
 }
 
 interface HttpErrorLike {
@@ -39,6 +41,7 @@ export default function EditListingModal({ listing, onClose }: Props) {
         defaultValues: {
             price: Number(listing.price).toFixed(2),
             stock: listing.stock,
+            description: listing.vendorDescription ?? "",
         },
     });
 
@@ -74,6 +77,7 @@ export default function EditListingModal({ listing, onClose }: Props) {
     const onSubmit = (values: FormValues) => {
         const body: UpdateBody = {};
         if (dirtyFields.price) body.price = values.price.trim();
+        if (dirtyFields.description) body.description = values.description.trim();
         if (dirtyFields.stock) body.stock = values.stock;
         if (Object.keys(body).length === 0) return onClose();
         mutation.mutate(body);
@@ -159,7 +163,30 @@ export default function EditListingModal({ listing, onClose }: Props) {
                                 </p>
                             )}
                         </div>
-
+                        <div>
+                            <label htmlFor="edit-description" className="text-sm font-medium text-slate-900">
+                                Description <span className="font-normal text-slate-500">(optional)</span>
+                            </label>
+                            <textarea
+                                id="edit-description"
+                                rows={4}
+                                placeholder={listing.adminDescription ?? "Add your own description"}
+                                aria-invalid={Boolean(errors.description)}
+                                className={`${fieldCls} mt-2 h-auto px-4 py-3`}
+                                {...register("description", {
+                                    maxLength: { value: 5000, message: "Use 5000 characters or less" },
+                                })}
+                            />
+                            {errors.description ? (
+                                <p role="alert" className="mt-1.5 text-xs text-rose-600">
+                                    {errors.description.message}
+                                </p>
+                            ) : (
+                                <p className="mt-1.5 text-xs text-slate-500">
+                                    Leave empty to show the default product description.
+                                </p>
+                            )}
+                        </div>
                         <div>
                             <label htmlFor="edit-stock" className="text-sm font-medium text-slate-900">
                                 Stock available
