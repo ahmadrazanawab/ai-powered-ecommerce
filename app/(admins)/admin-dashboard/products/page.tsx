@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState, type ReactNode } from "react";
+import { useEffect, useState, type ReactNode } from "react";
 import axios from "axios";
 import { z } from "zod";
 import { useForm } from "react-hook-form";
@@ -13,9 +13,13 @@ import {
 } from "@tanstack/react-query";
 import { api } from "@/app/lib/axios";
 import { productValidation } from "@/app/api/lib/validations/product-validation";
+import ProductImageManager, {
+    existingImageSelection,
+    type ProductImageSelection,
+} from "@/app/components/ProductImageManager";
+import type { ProductImage } from "@/app/lib/product-images";
 
 /* ---------- config ---------- */
-const MAX_IMAGE_MB = 5;
 const PAGE_SIZE = 12;
 
 // create (POST), update (PUT /:id) and deactivate (DELETE /:id) use this
@@ -36,6 +40,7 @@ interface ProductRow {
     price: string; // numeric column comes back as a string, e.g. "199.00"
     stock: number;
     imageUrl: string | null;
+    images: ProductImage[];
     isActive: boolean;
     categoryId: string;
     categoryName: string | null;
@@ -289,37 +294,12 @@ const ProductFormModal = ({
     // slug follows the name until the admin edits the slug manually
     const [slugTouched, setSlugTouched] = useState(isEdit);
 
-    const [image, setImage] = useState<File | null>(null);
-    const [localPreview, setLocalPreview] = useState<string | null>(null);
+    const [images, setImages] = useState<ProductImageSelection[]>(() =>
+        (product?.images ?? []).map(existingImageSelection)
+    );
+    const [imagesChanged, setImagesChanged] = useState(false);
     const [imageError, setImageError] = useState("");
-    const [dragging, setDragging] = useState(false);
-    const fileRef = useRef<HTMLInputElement>(null);
-
-    useEffect(() => {
-        if (!image) {
-            setLocalPreview(null);
-            return;
-        }
-        const url = URL.createObjectURL(image);
-        setLocalPreview(url);
-        return () => URL.revokeObjectURL(url);
-    }, [image]);
-
-    const preview = localPreview ?? (isEdit ? product?.imageUrl ?? null : null);
-
-    const handleFile = (file: File | undefined) => {
-        if (!file) return;
-        if (!file.type.startsWith("image/")) {
-            setImageError("Please choose an image file (JPG, PNG or WebP).");
-            return;
-        }
-        if (file.size > MAX_IMAGE_MB * 1024 * 1024) {
-            setImageError(`Image must be ${MAX_IMAGE_MB} MB or smaller.`);
-            return;
-        }
-        setImageError("");
-        setImage(file);
-    };
+    const [uploadProgress, setUploadProgress] = useState<number | null>(null);
 
     const saveMutation = useMutation({
         mutationFn: async (values: FormValues) => {
@@ -339,22 +319,50 @@ const ProductFormModal = ({
                 formData.append("description", description);
             }
 
-            // Update: image cannot be changed (the PUT route ignores it)
-            if (product) {
-                const res = await api.put(
-                    `${PRODUCTS_URL}/${product.productId}`,
-                    formData
-                );
-                return res.data;
+            const shouldSaveImages = !product || imagesChanged;
+
+            if (shouldSaveImages) {
+                let uploadIndex = 0;
+                const manifest = images.map((image) => {
+                    if (image.existingId) {
+                        return {
+                            existingId: image.existingId,
+                            isPrimary: image.isPrimary,
+                        };
+                    }
+
+                    if (!image.file) {
+                        throw new Error("An image selection is missing its file.");
+                    }
+
+                    formData.append("images", image.file);
+                    return {
+                        uploadIndex: uploadIndex++,
+                        isPrimary: image.isPrimary,
+                    };
+                });
+                formData.append("imageManifest", JSON.stringify(manifest));
             }
 
-            // Create: the image is required
-            if (image) formData.append("image", image);
-            const res = await api.post(PRODUCTS_URL, formData);
+            const onUploadProgress = (event: { loaded: number; total?: number }) => {
+                if (event.total) {
+                    setUploadProgress((event.loaded / event.total) * 100);
+                }
+            };
+
+            const res = product
+                ? await api.put(
+                      `${PRODUCTS_URL}/${product.productId}`,
+                      formData,
+                      { onUploadProgress }
+                  )
+                : await api.post(PRODUCTS_URL, formData, { onUploadProgress });
+
             return res.data;
         },
 
         onSuccess: async (data) => {
+            setUploadProgress(null);
             await queryClient.invalidateQueries({ queryKey: ["products"] });
             onSaved(
                 data?.message ??
@@ -365,6 +373,7 @@ const ProductFormModal = ({
         },
 
         onError: (error) => {
+            setUploadProgress(null);
             if (axios.isAxiosError(error)) {
                 console.error(error.response?.data ?? error.message);
 
@@ -395,11 +404,21 @@ const ProductFormModal = ({
     });
 
     const onSubmit = (values: FormValues) => {
-        if (!isEdit && !image) {
+        if (!isEdit && images.length === 0) {
             setImageError("Product image is required.");
             return;
         }
+        setImageError("");
+        setUploadProgress(
+            images.some((image) => image.file) ? 0 : null
+        );
         saveMutation.mutate(values);
+    };
+
+    const handleImagesChange = (next: ProductImageSelection[]) => {
+        setImages(next);
+        setImagesChanged(true);
+        setImageError("");
     };
 
     const pending = saveMutation.isPending;
@@ -637,123 +656,17 @@ const ProductFormModal = ({
                         </span>
                     </label>
 
-                    {/* Image */}
-                    <div>
-                        <span className={labelCls}>
-                            Product image
-                            {!isEdit && (
-                                <span className="font-normal text-slate-400">
-                                    {" "}
-                                    (required)
-                                </span>
-                            )}
-                        </span>
-
-                        {isEdit ? (
-                            <div className="flex items-center gap-4 rounded-2xl bg-slate-50 p-3 ring-1 ring-slate-200/70">
-                                <div className="h-20 w-28 shrink-0 overflow-hidden rounded-xl bg-slate-200">
-                                    {preview ? (
-                                        // eslint-disable-next-line @next/next/no-img-element
-                                        <img
-                                            src={preview}
-                                            alt={product?.name ?? "Product"}
-                                            className="h-full w-full object-cover"
-                                        />
-                                    ) : (
-                                        <div className="grid h-full w-full place-items-center text-slate-400">
-                                            <Icon name="image" className="h-6 w-6" />
-                                        </div>
-                                    )}
-                                </div>
-                                <p className="text-sm text-slate-500">
-                                    The current image is kept. Image changes are
-                                    not supported when editing.
-                                </p>
-                            </div>
-                        ) : (
-                            <>
-                                <input
-                                    ref={fileRef}
-                                    type="file"
-                                    accept="image/*"
-                                    className="hidden"
-                                    onChange={(e) => {
-                                        handleFile(e.target.files?.[0]);
-                                        e.target.value = "";
-                                    }}
-                                />
-
-                                {preview ? (
-                                    <div className="relative overflow-hidden rounded-2xl ring-1 ring-slate-200/70">
-                                        {/* eslint-disable-next-line @next/next/no-img-element */}
-                                        <img
-                                            src={preview}
-                                            alt="Selected preview"
-                                            className="h-48 w-full object-cover"
-                                        />
-                                        <div className="absolute inset-x-0 bottom-0 flex items-center justify-between gap-2 bg-gradient-to-t from-slate-950/70 to-transparent p-3">
-                                            <span className="truncate text-xs text-white/90">
-                                                {image?.name}
-                                            </span>
-                                            <div className="flex gap-2">
-                                                <button
-                                                    type="button"
-                                                    onClick={() =>
-                                                        fileRef.current?.click()
-                                                    }
-                                                    className="rounded-lg bg-white/90 px-3 py-1.5 text-xs font-medium text-slate-900 hover:bg-white"
-                                                >
-                                                    Change
-                                                </button>
-                                                <button
-                                                    type="button"
-                                                    onClick={() => setImage(null)}
-                                                    className="rounded-lg bg-white/90 px-3 py-1.5 text-xs font-medium text-rose-600 hover:bg-white"
-                                                >
-                                                    Remove
-                                                </button>
-                                            </div>
-                                        </div>
-                                    </div>
-                                ) : (
-                                    <button
-                                        type="button"
-                                        onClick={() => fileRef.current?.click()}
-                                        onDragOver={(e) => {
-                                            e.preventDefault();
-                                            setDragging(true);
-                                        }}
-                                        onDragLeave={() => setDragging(false)}
-                                        onDrop={(e) => {
-                                            e.preventDefault();
-                                            setDragging(false);
-                                            handleFile(e.dataTransfer.files?.[0]);
-                                        }}
-                                        className={`flex w-full flex-col items-center justify-center gap-2 rounded-2xl border-2 border-dashed px-4 py-10 text-center transition-colors ${dragging
-                                            ? "border-indigo-400 bg-indigo-50"
-                                            : "border-slate-300 bg-slate-50 hover:border-slate-400 hover:bg-white"
-                                            }`}
-                                    >
-                                        <span className="grid h-12 w-12 place-items-center rounded-2xl bg-white text-slate-500 ring-1 ring-slate-200">
-                                            <Icon name="image" className="h-6 w-6" />
-                                        </span>
-                                        <span className="text-sm font-medium text-slate-700">
-                                            Click to upload or drag and drop
-                                        </span>
-                                        <span className="text-xs text-slate-400">
-                                            JPG, PNG or WebP, up to {MAX_IMAGE_MB} MB
-                                        </span>
-                                    </button>
-                                )}
-                            </>
-                        )}
-
-                        {imageError && (
-                            <p className="mt-1.5 text-sm text-error">
-                                {imageError}
-                            </p>
-                        )}
-                    </div>
+                    <ProductImageManager
+                        images={images}
+                        onChange={handleImagesChange}
+                        uploadProgress={uploadProgress}
+                        disabled={pending}
+                    />
+                    {imageError && (
+                        <p role="alert" className="text-sm text-error">
+                            {imageError}
+                        </p>
+                    )}
 
                     {saveMutation.isError && (
                         <div

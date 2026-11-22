@@ -14,17 +14,32 @@ import { db } from "../lib/db";
 import { productSchema } from "../lib/schema/product-schema";
 import { productValidation } from "../lib/validations/product-validation";
 import { verifyAdminToken } from "../auth/admin/verify-token";
-import { uploadImageToCloudinary } from "../lib/cloudinary";
 import { categorySchema } from "@/app/api/lib/schema/category-schema";
 import { vendors } from "@/app/api/lib/schema/vendor";
 import { vendorProductSchema } from "@/app/api/lib/schema/vendor-product-schema";
 import { effectiveDescription } from "../lib/schema/resolve-description";
+import { productImages } from "../lib/schema/product-image-schema";
+import {
+    getProductImageGroups,
+    getResolvedProductImages,
+} from "../lib/product-image-queries";
+import {
+    buildProductImageRows,
+    deleteCloudinaryImages,
+    getProductImageFiles,
+    prepareProductImageManifest,
+    ProductImageStorageError,
+    ProductImageValidationError,
+    uploadProductImageFiles,
+} from "../lib/product-image-storage";
 
 export const runtime = "nodejs";
 
 // POST: Admin creates a shared catalog product
 export async function POST(req: NextRequest) {
-    let uploadedPublicId: string | undefined;
+    let uploadedImages: Awaited<
+        ReturnType<typeof uploadProductImageFiles>
+    > = [];
 
     try {
         // 1. Authenticate admin
@@ -49,13 +64,14 @@ export async function POST(req: NextRequest) {
 
         // 3. Read multipart form data
         const formData = await req.formData();
-        const image = formData.get("image");
+        const files = getProductImageFiles(formData);
+        const manifest = prepareProductImageManifest(formData, files, []);
 
-        if (!(image instanceof File) || image.size === 0) {
+        if (manifest.length === 0) {
             return NextResponse.json(
                 {
                     success: false,
-                    message: "Product image is required",
+                    message: "At least one product image is required",
                 },
                 { status: 400 }
             );
@@ -93,19 +109,43 @@ export async function POST(req: NextRequest) {
             );
         }
 
-        // 5. Upload product image
-        const uploadedImage = await uploadImageToCloudinary(image);
-        uploadedPublicId = uploadedImage.publicId;
+        uploadedImages = await uploadProductImageFiles(
+            files,
+            "aiecommerce/products"
+        );
 
-        // 6. Insert into the shared catalog
-        const [product] = await db
-            .insert(productSchema)
-            .values({
-                ...result.data,
-                imageUrl: uploadedImage.url,
-                createdBy: auth.payload.adminId,
-            })
-            .returning();
+        const primaryEntry = manifest.find((entry) => entry.isPrimary);
+        const primaryImage =
+            primaryEntry?.uploadIndex !== undefined
+                ? uploadedImages[primaryEntry.uploadIndex]
+                : undefined;
+
+        if (!primaryImage) {
+            throw new ProductImageValidationError(
+                "Select a primary product image"
+            );
+        }
+
+        const product = await db.transaction(async (tx) => {
+            const [createdProduct] = await tx
+                .insert(productSchema)
+                .values({
+                    ...result.data,
+                    imageUrl: primaryImage.url,
+                    createdBy: auth.payload.adminId,
+                })
+                .returning();
+
+            const imageRows = buildProductImageRows(
+                { source: "admin", productId: createdProduct.id },
+                manifest,
+                [],
+                uploadedImages
+            ).images;
+
+            await tx.insert(productImages).values(imageRows);
+            return createdProduct;
+        });
 
         return NextResponse.json(
             {
@@ -117,6 +157,24 @@ export async function POST(req: NextRequest) {
         );
     } catch (error) {
         console.error("CREATE_PRODUCT_ERROR:", error);
+
+        if (uploadedImages.length > 0) {
+            await deleteCloudinaryImages(uploadedImages);
+        }
+
+        if (error instanceof ProductImageValidationError) {
+            return NextResponse.json(
+                { success: false, message: error.message },
+                { status: 400 }
+            );
+        }
+
+        if (error instanceof ProductImageStorageError) {
+            return NextResponse.json(
+                { success: false, message: error.message },
+                { status: 502 }
+            );
+        }
 
         // Handle duplicate slug/SKU errors from PostgreSQL
         const dbError = error as {
@@ -297,6 +355,11 @@ export async function GET(request: NextRequest) {
                     .orderBy(asc(vendorProductSchema.price))
                 : [];
 
+        const imageGroups = await getProductImageGroups(
+            productIds,
+            offers.map((offer) => offer.listingId)
+        );
+
         // const offers =
         //     productIds.length > 0
         //         ? await db
@@ -336,10 +399,18 @@ export async function GET(request: NextRequest) {
         // 10. Return the admin product AND its vendor listings
         const customerProducts = products.flatMap((product) => {
             const productOffers = offersMap.get(product.productId) || [];
+            const adminImages = getResolvedProductImages(
+                imageGroups,
+                product.productId,
+                null,
+                product.imageUrl
+            );
 
             // Admin product is always shown
             const adminItem = {
                 ...product,
+                images: adminImages,
+                imageUrl: adminImages[0]?.url ?? null,
                 listingId: null,
                 vendorId: null,
                 vendorName: null,
@@ -347,16 +418,27 @@ export async function GET(request: NextRequest) {
             };
 
             // Vendor listings of the same product
-            const vendorItems = productOffers.map((offer) => ({
-                ...product,
-                description: offer.description,   // ADD
-                listingId: offer.listingId,
-                price: offer.price,
-                stock: offer.stock,
-                vendorId: offer.vendorId,
-                vendorName: offer.vendorName,
-                source: "vendor" as const,
-            }));
+            const vendorItems = productOffers.map((offer) => {
+                const images = getResolvedProductImages(
+                    imageGroups,
+                    product.productId,
+                    offer.listingId,
+                    product.imageUrl
+                );
+
+                return {
+                    ...product,
+                    description: offer.description,
+                    images,
+                    imageUrl: images[0]?.url ?? null,
+                    listingId: offer.listingId,
+                    price: offer.price,
+                    stock: offer.stock,
+                    vendorId: offer.vendorId,
+                    vendorName: offer.vendorName,
+                    source: "vendor" as const,
+                };
+            });
 
             // const vendorItems = productOffers.map((offer) => ({
             //     ...product,

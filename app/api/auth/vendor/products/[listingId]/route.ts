@@ -6,6 +6,8 @@ import { db } from "@/app/api/lib/db";
 import { vendorProductSchema } from "@/app/api/lib/schema/vendor-product-schema";
 import { vendors } from "@/app/api/lib/schema/vendor";
 import { verifyVendorToken } from "../../verify-token-vendor";
+import { cleanupOrphanedProductImages } from "@/app/api/lib/product-image-storage";
+import { productImages } from "@/app/api/lib/schema/product-image-schema";
 
 export const runtime = "nodejs";
 
@@ -310,6 +312,16 @@ export async function DELETE(
             );
         }
 
+        const existingImages = await db
+            .select({ publicId: productImages.publicId })
+            .from(productImages)
+            .where(
+                and(
+                    eq(productImages.vendorProductId, listingId),
+                    eq(productImages.source, "vendor")
+                )
+            );
+
         // 4. Delete only a listing owned by this vendor
         const [deletedListing] = await db
             .delete(vendorProductSchema)
@@ -327,6 +339,8 @@ export async function DELETE(
                 { status: 404 }
             );
         }
+
+        await cleanupOrphanedProductImages(existingImages);
 
         return NextResponse.json(
             {

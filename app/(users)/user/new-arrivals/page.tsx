@@ -7,6 +7,7 @@ import { keepPreviousData, useQuery } from "@tanstack/react-query";
 import { useForm } from "react-hook-form";
 import { api } from "@/app/lib/axios";
 import { useAddToCart } from "@/app/hooks/use-cart";
+import ProductImageDisplay from "@/app/components/ProductImageDisplay";
 
 /* ---------- edit these to match your store ---------- */
 const BRAND = "Aurelia";
@@ -263,31 +264,21 @@ function ProductImage({
     product,
     outOfStock,
     className = "",
-    iconClass = "h-16 w-16 sm:h-20 sm:w-20",
 }: {
     product: ProductI;
     outOfStock: boolean;
     className?: string;
-    iconClass?: string;
 }) {
     return (
         <div
             className={`absolute inset-0 bg-gradient-to-br ${toneFor(product.productId)} ${className}`}
         >
-            {product.imageUrl ? (
-                // eslint-disable-next-line @next/next/no-img-element
-                <img
-                    src={product.imageUrl}
-                    alt={product.name}
-                    loading="lazy"
-                    className={`h-full w-full object-cover transition-transform duration-500 group-hover:scale-105 ${outOfStock ? "opacity-60 grayscale" : ""
-                        }`}
-                />
-            ) : (
-                <div className="grid h-full w-full place-items-center text-amber-200/40 transition-transform duration-500 group-hover:scale-110">
-                    <GemIcon className={iconClass} />
-                </div>
-            )}
+            <ProductImageDisplay
+                src={product.imageUrl}
+                alt={product.name}
+                sizes="(max-width: 640px) 50vw, (max-width: 1024px) 33vw, 25vw"
+                className={`object-cover transition-transform duration-500 group-hover:scale-105 ${outOfStock ? "opacity-60 grayscale" : ""}`}
+            />
         </div>
     );
 }
@@ -420,7 +411,6 @@ function FeaturedArrival({ product }: { product: ProductI }) {
                 <ProductImage
                     product={product}
                     outOfStock={a.outOfStock}
-                    iconClass="h-24 w-24 sm:h-28 sm:w-28"
                 />
 
                 <div className="pointer-events-none absolute inset-x-0 bottom-0 h-1/3 bg-gradient-to-t from-slate-950/40 to-transparent" />

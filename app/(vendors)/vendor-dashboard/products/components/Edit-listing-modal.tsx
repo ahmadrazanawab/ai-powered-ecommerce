@@ -1,12 +1,16 @@
 // FILE: app/(vendors)/vendor/products/components/vendor/edit-listing-modal.tsx
 "use client";
 
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { useForm } from "react-hook-form";
 import { api } from "@/app/lib/axios";
 import { CURRENCY, GemIcon, Svg, fieldCls, goldBtn } from "@/app/components/Shop-ui";
 import type { VendorListingI } from "./Listing-card";
+import ProductImageManager, {
+    existingImageSelection,
+    type ProductImageSelection,
+} from "@/app/components/ProductImageManager";
 
 interface FormValues {
     price: string; // kept as text: the API accepts up to 2 decimals
@@ -31,6 +35,11 @@ interface Props {
 
 export default function EditListingModal({ listing, onClose }: Props) {
     const queryClient = useQueryClient();
+    const [images, setImages] = useState<ProductImageSelection[]>(() =>
+        (listing.vendorImages ?? []).map(existingImageSelection)
+    );
+    const [imagesChanged, setImagesChanged] = useState(false);
+    const [uploadProgress, setUploadProgress] = useState<number | null>(null);
 
     const {
         register,
@@ -46,12 +55,64 @@ export default function EditListingModal({ listing, onClose }: Props) {
     });
 
     const mutation = useMutation({
-        mutationFn: async (body: UpdateBody) =>
-            (await api.put(`/api/auth/vendor/products/${listing.listingId}`, body)).data,
+        mutationFn: async (body: UpdateBody) => {
+            if (Object.keys(body).length > 0) {
+                await api.put(
+                    `/api/auth/vendor/products/${listing.listingId}`,
+                    body
+                );
+            }
+
+            if (imagesChanged) {
+                const formData = new FormData();
+                let uploadIndex = 0;
+                const manifest = images.map((image) => {
+                    if (image.existingId) {
+                        return {
+                            existingId: image.existingId,
+                            isPrimary: image.isPrimary,
+                        };
+                    }
+
+                    if (!image.file) {
+                        throw new Error(
+                            "An image selection is missing its file."
+                        );
+                    }
+
+                    formData.append("images", image.file);
+                    return {
+                        uploadIndex: uploadIndex++,
+                        isPrimary: image.isPrimary,
+                    };
+                });
+                formData.append("imageManifest", JSON.stringify(manifest));
+
+                await api.put(
+                    `/api/auth/vendor/products/${listing.listingId}/images`,
+                    formData,
+                    {
+                        onUploadProgress: (event) => {
+                            if (event.total) {
+                                setUploadProgress(
+                                    (event.loaded / event.total) * 100
+                                );
+                            }
+                        },
+                    }
+                );
+            }
+        },
+        onMutate: () =>
+            setUploadProgress(
+                imagesChanged && images.some((image) => image.file) ? 0 : null
+            ),
         onSuccess: () => {
+            setUploadProgress(null);
             queryClient.invalidateQueries({ queryKey: ["vendor-listings"] });
             onClose();
         },
+        onError: () => setUploadProgress(null),
     });
 
     // keep the latest onClose without re-running the effect below
@@ -79,7 +140,7 @@ export default function EditListingModal({ listing, onClose }: Props) {
         if (dirtyFields.price) body.price = values.price.trim();
         if (dirtyFields.description) body.description = values.description.trim();
         if (dirtyFields.stock) body.stock = values.stock;
-        if (Object.keys(body).length === 0) return onClose();
+        if (Object.keys(body).length === 0 && !imagesChanged) return onClose();
         mutation.mutate(body);
     };
 
@@ -133,6 +194,21 @@ export default function EditListingModal({ listing, onClose }: Props) {
                     </div>
 
                     <div className="space-y-5 p-5 sm:p-6">
+                        <div className="rounded-xl bg-slate-50 px-4 py-3 text-xs leading-relaxed text-slate-600">
+                            {images.length > 0
+                                ? "Your listing uses these images instead of the admin product gallery."
+                                : "No vendor images are selected. The admin product gallery is shown to customers."}
+                        </div>
+                        <ProductImageManager
+                            images={images}
+                            onChange={(next) => {
+                                setImages(next);
+                                setImagesChanged(true);
+                            }}
+                            uploadProgress={uploadProgress}
+                            disabled={mutation.isPending}
+                        />
+
                         <div>
                             <label htmlFor="edit-price" className="text-sm font-medium text-slate-900">
                                 Your price
@@ -229,10 +305,14 @@ export default function EditListingModal({ listing, onClose }: Props) {
                         </button>
                         <button
                             type="submit"
-                            disabled={!isDirty || mutation.isPending}
+                            disabled={(!isDirty && !imagesChanged) || mutation.isPending}
                             className={`${goldBtn} disabled:cursor-not-allowed disabled:opacity-50`}
                         >
-                            {mutation.isPending ? "Saving…" : "Save changes"}
+                            {mutation.isPending
+                                ? images.some((image) => image.file)
+                                    ? "Uploading…"
+                                    : "Saving…"
+                                : "Save changes"}
                         </button>
                     </div>
                 </form>

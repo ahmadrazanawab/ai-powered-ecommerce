@@ -9,6 +9,10 @@ import { vendors } from "@/app/api/lib/schema/vendor";
 import { categorySchema } from "@/app/api/lib/schema/category-schema";
 import { verifyVendorToken } from "../verify-token-vendor";
 import { effectiveDescription } from "@/app/api/lib/schema/resolve-description";
+import {
+    getProductImageGroups,
+    getResolvedProductImages,
+} from "@/app/api/lib/product-image-queries";
 
 export const runtime = "nodejs";
 
@@ -80,11 +84,33 @@ export async function GET(req: NextRequest) {
             .where(eq(vendorProductSchema.vendorId, vendorId))
             .orderBy(desc(vendorProductSchema.createdAt));
 
+        const imageGroups = await getProductImageGroups(
+            listings.map((listing) => listing.productId),
+            listings.map((listing) => listing.listingId)
+        );
+        const listingsWithImages = listings.map((listing) => {
+            const vendorImages =
+                imageGroups.vendorByListing.get(listing.listingId) ?? [];
+            const images = getResolvedProductImages(
+                imageGroups,
+                listing.productId,
+                listing.listingId,
+                listing.imageUrl
+            );
+
+            return {
+                ...listing,
+                vendorImages,
+                images,
+                imageUrl: images[0]?.url ?? null,
+            };
+        });
+
         return NextResponse.json(
             {
                 success: true,
                 message: "Your listings fetched successfully",
-                data: listings,
+                data: listingsWithImages,
             },
             { status: 200 }
         );

@@ -8,6 +8,7 @@ import {
     cardCls,
     formatPrice,
 } from "@/app/components/Shop-ui";
+import type { ProductImage } from "@/app/lib/product-images";
 
 export interface VendorListingI {
     listingId: string;
@@ -21,6 +22,8 @@ export interface VendorListingI {
     adminDescription: string | null;     // ADD: catalog default
     vendorDescription: string | null;    // ADD: vendor's own override
     imageUrl: string | null;
+    images?: ProductImage[];
+    vendorImages?: ProductImage[];
     price: string | number;
     stock: number;
     isActive: boolean;

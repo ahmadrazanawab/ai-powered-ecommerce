@@ -9,6 +9,10 @@ import { and, eq, asc } from "drizzle-orm";
 import { vendors } from "../../../lib/schema/vendor";
 import { vendorProductSchema } from "../../../lib/schema/vendor-product-schema";
 import { effectiveDescription } from "@/app/api/lib/schema/resolve-description";
+import {
+    getProductImageGroups,
+    getResolvedProductImages,
+} from "@/app/api/lib/product-image-queries";
 export async function GET(
     _request: NextRequest,
     { params }: { params: Promise<{ slug: string }> } // Next.js 15: params is a Promise
@@ -91,11 +95,41 @@ export async function GET(
         //     )
         //     .orderBy(asc(vendorProductSchema.price));
 
+        const imageGroups = await getProductImageGroups(
+        [product.productId],
+        offers.map((offer) => offer.listingId)
+        );
+        const productImages = getResolvedProductImages(
+        imageGroups,
+        product.productId,
+        null,
+        product.imageUrl
+        );
+        const offersWithImages = offers.map((offer) => {
+        const images = getResolvedProductImages(
+            imageGroups,
+            product.productId,
+            offer.listingId,
+            product.imageUrl
+        );
+
+        return {
+            ...offer,
+            images,
+            imageUrl: images[0]?.url ?? null,
+        };
+        });
+
         return NextResponse.json(
             {
                 success: true,
                 message: "Product fetched successfully",
-                data: { ...product, offers },
+            data: {
+                ...product,
+                images: productImages,
+                imageUrl: productImages[0]?.url ?? null,
+                offers: offersWithImages,
+            },
             },
             { status: 200 }
         );

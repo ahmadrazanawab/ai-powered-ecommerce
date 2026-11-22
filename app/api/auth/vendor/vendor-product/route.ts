@@ -8,11 +8,30 @@ import { vendors } from "@/app/api/lib/schema/vendor";
 import { categorySchema } from "@/app/api/lib/schema/category-schema";
 import { verifyVendorToken } from "../verify-token-vendor";
 import { effectiveDescription } from "@/app/api/lib/schema/resolve-description"; // ADD
+import {
+    getProductImageGroups,
+    getResolvedProductImages,
+} from "@/app/api/lib/product-image-queries";
+import { productImages } from "@/app/api/lib/schema/product-image-schema";
+import {
+    buildProductImageRows,
+    deleteCloudinaryImages,
+    getProductImageFiles,
+    prepareProductImageManifest,
+    ProductImageStorageError,
+    ProductImageValidationError,
+    uploadProductImageFiles,
+} from "@/app/api/lib/product-image-storage";
 
 export const runtime = "nodejs";
 
 // POST: Vendor lists an existing catalog product
 export async function POST(req: NextRequest) {
+    let uploadedImages: Awaited<
+        ReturnType<typeof uploadProductImageFiles>
+    > = [];
+    let transactionCompleted = false;
+
     try {
         const auth = await verifyVendorToken(req);
 
@@ -47,10 +66,41 @@ export async function POST(req: NextRequest) {
             );
         }
 
-        const body = await req.json();
+        let body: Record<string, unknown>;
+        let formData: FormData | null = null;
+        let files: File[] = [];
 
-        const productId =
-            typeof body.productId === "string" ? body.productId : "";
+        if (req.headers.get("content-type")?.includes("multipart/form-data")) {
+            formData = await req.formData();
+            const activeValue = formData.get("isActive");
+            body = {
+                productId: formData.get("productId"),
+                price: formData.get("price"),
+                stock: formData.get("stock"),
+                description: formData.get("description"),
+                ...(activeValue === null
+                    ? {}
+                    : { isActive: activeValue === "true" }),
+            };
+            files = getProductImageFiles(formData);
+        } else {
+            const json: unknown = await req.json();
+
+            if (
+                typeof json !== "object" ||
+                json === null ||
+                Array.isArray(json)
+            ) {
+                return NextResponse.json(
+                    { success: false, message: "Request body must be an object" },
+                    { status: 400 }
+                );
+            }
+
+            body = json as Record<string, unknown>;
+        }
+
+        const productId = typeof body.productId === "string" ? body.productId : "";
         const price = body.price;
         const stock = body.stock;
 
@@ -125,17 +175,50 @@ export async function POST(req: NextRequest) {
         }
 
         // Create the vendor's offer; do not create a catalog product here
-        const [listing] = await db
-            .insert(vendorProductSchema)
-            .values({
-                vendorId,
-                productId,
-                price: String(price),
-                stock: Number(stock),
-                description, // ADD
-                isActive: body.isActive === undefined ? true : body.isActive === true,
-            })
-            .returning();
+        const manifest = formData
+            ? prepareProductImageManifest(formData, files, [])
+            : [];
+        uploadedImages =
+            files.length > 0
+                ? await uploadProductImageFiles(
+                      files,
+                      `aiecommerce/vendor-products/${vendorId}/${productId}`
+                  )
+                : [];
+
+        const listing = await db.transaction(async (tx) => {
+            const [createdListing] = await tx
+                .insert(vendorProductSchema)
+                .values({
+                    vendorId,
+                    productId,
+                    price: String(price),
+                    stock: Number(stock),
+                    description,
+                    isActive:
+                        body.isActive === undefined
+                            ? true
+                            : body.isActive === true,
+                })
+                .returning();
+
+            if (uploadedImages.length > 0) {
+                const imageRows = buildProductImageRows(
+                    {
+                        source: "vendor",
+                        vendorProductId: createdListing.id,
+                    },
+                    manifest,
+                    [],
+                    uploadedImages
+                ).images;
+
+                await tx.insert(productImages).values(imageRows);
+            }
+
+            return createdListing;
+        });
+        transactionCompleted = true;
 
         return NextResponse.json(
             {
@@ -147,6 +230,24 @@ export async function POST(req: NextRequest) {
         );
     } catch (error) {
         console.error("CREATE_VENDOR_LISTING_ERROR:", error);
+
+        if (uploadedImages.length > 0 && !transactionCompleted) {
+            await deleteCloudinaryImages(uploadedImages);
+        }
+
+        if (error instanceof ProductImageValidationError) {
+            return NextResponse.json(
+                { success: false, message: error.message },
+                { status: 400 }
+            );
+        }
+
+        if (error instanceof ProductImageStorageError) {
+            return NextResponse.json(
+                { success: false, message: error.message },
+                { status: 502 }
+            );
+        }
 
         const dbError = error as { code?: string };
 
@@ -221,11 +322,30 @@ export async function GET() {
                 )
             );
 
+        const imageGroups = await getProductImageGroups(
+            products.map((product) => product.productId),
+            products.map((product) => product.listingId)
+        );
+        const productsWithImages = products.map((product) => {
+            const images = getResolvedProductImages(
+                imageGroups,
+                product.productId,
+                product.listingId,
+                product.imageUrl
+            );
+
+            return {
+                ...product,
+                images,
+                imageUrl: images[0]?.url ?? null,
+            };
+        });
+
         return NextResponse.json(
             {
                 success: true,
                 message: "Products fetched successfully",
-                data: products,
+                data: productsWithImages,
             },
             { status: 200 }
         );

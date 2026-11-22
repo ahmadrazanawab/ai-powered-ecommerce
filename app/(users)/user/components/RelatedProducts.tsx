@@ -1,10 +1,11 @@
 
 "use client";
 
-import { useMemo, type ReactNode } from "react";
+import { useMemo } from "react";
 import Link from "next/link";
 import { useQuery } from "@tanstack/react-query";
 import { api } from "@/app/lib/axios";
+import ProductImageDisplay from "@/app/components/ProductImageDisplay";
 
 /* ---------- config ---------- */
 const CURRENCY = "$";
@@ -28,39 +29,6 @@ interface RelatedI {
 /* ---------- local helpers ---------- */
 const cardCls =
     "rounded-3xl bg-white shadow-[0_20px_60px_-20px_rgba(15,23,42,0.18)] ring-1 ring-slate-200/70";
-
-function Svg({
-    children,
-    className = "h-5 w-5",
-    strokeWidth = 1.7,
-}: {
-    children: ReactNode;
-    className?: string;
-    strokeWidth?: number;
-}) {
-    return (
-        <svg
-            xmlns="http://www.w3.org/2000/svg"
-            viewBox="0 0 24 24"
-            fill="none"
-            stroke="currentColor"
-            strokeWidth={strokeWidth}
-            strokeLinecap="round"
-            strokeLinejoin="round"
-            className={className}
-            aria-hidden="true"
-        >
-            {children}
-        </svg>
-    );
-}
-
-const GemIcon = ({ className }: { className?: string }) => (
-    <Svg className={className} strokeWidth={1.5}>
-        <path d="M6 4h12l3 5-9 11L3 9l3-5Z" />
-        <path d="M3 9h18M9 4l3 5 3-5M12 9v11" />
-    </Svg>
-);
 
 function formatPrice(value: string | number) {
     const n = Number(value);
@@ -191,22 +159,12 @@ export function RelatedProducts({
                                 className={`${cardCls} group flex flex-col overflow-hidden transition-all duration-300 hover:-translate-y-1 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-400`}
                             >
                                 <div className="relative aspect-square overflow-hidden bg-gradient-to-br from-slate-900 to-indigo-900">
-                                    {p.imageUrl ? (
-                                        // eslint-disable-next-line @next/next/no-img-element
-                                        <img
-                                            src={p.imageUrl}
-                                            alt={p.name}
-                                            loading="lazy"
-                                            className={`h-full w-full object-cover transition-transform duration-500 group-hover:scale-105 ${soldOut
-                                                    ? "opacity-60 grayscale"
-                                                    : ""
-                                                }`}
-                                        />
-                                    ) : (
-                                        <div className="grid h-full w-full place-items-center text-amber-200/40">
-                                            <GemIcon className="h-16 w-16" />
-                                        </div>
-                                    )}
+                                    <ProductImageDisplay
+                                        src={p.imageUrl}
+                                        alt={p.name}
+                                        sizes="(max-width: 768px) 50vw, 25vw"
+                                        className={`object-cover transition-transform duration-500 group-hover:scale-105 ${soldOut ? "opacity-60 grayscale" : ""}`}
+                                    />
 
                                     {soldOut && (
                                         <span className="absolute left-3 top-3 rounded-full bg-slate-950/85 px-3 py-1 text-[11px] font-semibold text-white backdrop-blur">

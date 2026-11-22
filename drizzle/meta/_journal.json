@@ -43,6 +43,13 @@
       "when": 1795342431919,
       "tag": "0005_add_razorpay_order_tracking",
       "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "7",
+      "when": 1795345095390,
+      "tag": "0006_add_product_images",
+      "breakpoints": true
     }
   ]
 }

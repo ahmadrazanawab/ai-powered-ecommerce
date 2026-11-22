@@ -10,6 +10,8 @@ import { useForm } from "react-hook-form";
 import { api } from "@/app/lib/axios";
 import { useAddToCart } from "@/app/hooks/use-cart";
 import { RelatedProducts } from "../../components/RelatedProducts";
+import ProductImageGallery from "@/app/components/ProductImageGallery";
+import type { ProductImage } from "@/app/lib/product-images";
 
 /* ---------- edit these to match your store ---------- */
 const CURRENCY = "$";
@@ -22,6 +24,7 @@ interface OfferI {
     vendorName: string;
     price: string | number;
     stock: number;
+    images?: ProductImage[];
 }
 
 interface ProductDetailI {
@@ -30,6 +33,7 @@ interface ProductDetailI {
     slug: string;
     description: string | null;
     imageUrl: string | null;
+    images?: ProductImage[];
     categoryId: string;
     categoryName: string;
     price: string | number;
@@ -182,6 +186,7 @@ function ProductDetailContent() {
                 label: vendor.vendorName,
                 price: vendor.price,
                 stock: vendor.stock,
+                images: vendor.images,
             },
         ];
     }, [product, listingParam]);
@@ -199,6 +204,10 @@ function ProductDetailContent() {
     const quantity = Number(watch("quantity")) || 1;
 
     const selected = options[0];
+    const galleryImages =
+        selected?.images?.length
+            ? selected.images
+            : product?.images ?? [];
 
     const maxQty = Math.max(1, selected?.stock ?? 1);
 
@@ -364,26 +373,11 @@ function ProductDetailContent() {
 
                     {/* ---------- image ---------- */}
                     <div className="lg:sticky lg:top-24 lg:self-start">
-                        <div
-                            className={`${cardCls} relative aspect-square overflow-hidden bg-gradient-to-br from-slate-900 to-indigo-900`}
-                        >
-                            {product.imageUrl ? (
-                                // eslint-disable-next-line @next/next/no-img-element
-                                <img
-                                    src={product.imageUrl}
-                                    alt={product.name}
-                                    className="h-full w-full object-cover"
-                                />
-                            ) : (
-                                <div className="grid h-full w-full place-items-center text-amber-200/40">
-                                    <GemIcon className="h-28 w-28" />
-                                </div>
-                            )}
-
-                            <span className="absolute left-4 top-4 rounded-full bg-white/85 px-3 py-1 text-xs font-medium text-slate-700 backdrop-blur">
-                                {product.categoryName}
-                            </span>
-                        </div>
+                        <ProductImageGallery
+                            images={galleryImages}
+                            alt={product.name}
+                            badge={product.categoryName}
+                        />
                     </div>
 
                     {/* ---------- details ---------- */}

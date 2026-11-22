@@ -4,6 +4,10 @@ import { db } from "@/app/api/lib/db";
 import { productSchema } from "@/app/api/lib/schema/product-schema"; 
 import { categorySchema } from "@/app/api/lib/schema/category-schema";
 import { verifyAdminToken } from "../verify-token"; 
+import {
+    getProductImageGroups,
+    getResolvedProductImages,
+} from "@/app/api/lib/product-image-queries";
 
 export async function GET(req: NextRequest) {
     try {
@@ -59,12 +63,31 @@ export async function GET(req: NextRequest) {
             .limit(limit)
             .offset((page - 1) * limit);
 
+        const imageGroups = await getProductImageGroups(
+            data.map((product) => product.productId),
+            []
+        );
+        const productsWithImages = data.map((product) => {
+            const images = getResolvedProductImages(
+                imageGroups,
+                product.productId,
+                null,
+                product.imageUrl
+            );
+
+            return {
+                ...product,
+                images,
+                imageUrl: images[0]?.url ?? null,
+            };
+        });
+
         const total = Number(totalResult?.total ?? 0);
 
         return NextResponse.json({
             success: true,
             message: "Products fetched successfully",
-            data,
+            data: productsWithImages,
             pagination: { page, limit, total, totalPages: Math.ceil(total / limit) },
         },{status:200});
     } catch (error) {

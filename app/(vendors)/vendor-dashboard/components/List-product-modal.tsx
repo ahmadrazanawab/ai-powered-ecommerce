@@ -1,13 +1,16 @@
 // FILE: app/components/vendor/list-product-modal.tsx
 "use client";
 
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import Link from "next/link";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { useForm } from "react-hook-form";
 import { api } from "@/app/lib/axios";
 import { CURRENCY, GemIcon, Svg, fieldCls, goldBtn } from "@/app/components/Shop-ui";
 import type { CatalogProductI } from "../components/Catalog-card";
+import ProductImageManager, {
+    type ProductImageSelection,
+} from "@/app/components/ProductImageManager";
 
 
 /* ---------- CHECK THIS AGAINST YOUR vendor-products/route.ts ---------- */
@@ -33,6 +36,8 @@ interface Props {
 
 export default function ListProductModal({ product, categoryName, onClose }: Props) {
     const queryClient = useQueryClient();
+    const [images, setImages] = useState<ProductImageSelection[]>([]);
+    const [uploadProgress, setUploadProgress] = useState<number | null>(null);
 
     const {
         register,
@@ -44,29 +49,39 @@ export default function ListProductModal({ product, categoryName, onClose }: Pro
     const mutation = useMutation({
         mutationFn: async (values: FormValues) => {
             const description = values.description.trim();
+            const formData = new FormData();
+            formData.append("productId", product.id);
+            formData.append("price", String(values.price));
+            formData.append("stock", String(values.stock));
+            if (description) formData.append("description", description);
+
+            const manifest = images.map((image, uploadIndex) => {
+                if (!image.file) {
+                    throw new Error("An image selection is missing its file.");
+                }
+
+                formData.append("images", image.file);
+                return { uploadIndex, isPrimary: image.isPrimary };
+            });
+            formData.append("imageManifest", JSON.stringify(manifest));
 
             return (
-                await api.post(LISTING_ENDPOINT, {
-                    productId: product.id,
-                    price: values.price,
-                    stock: values.stock,
-                    ...(description ? { description } : {}), // ADD: omitted when empty
+                await api.post(LISTING_ENDPOINT, formData, {
+                    onUploadProgress: (event) => {
+                        if (event.total) {
+                            setUploadProgress((event.loaded / event.total) * 100);
+                        }
+                    },
                 })
             ).data;
         },
-        // mutationFn: async (values: FormValues) =>
-        //     (
-        //         await api.post(LISTING_ENDPOINT, {
-        //             productId: product.id,
-        //             price: values.price,
-        //             stock: values.stock,
-        //             ...(description ? { description } : {}),
-        //         })
-        //     ).data,
+        onMutate: () => setUploadProgress(images.length > 0 ? 0 : null),
         onSuccess: () => {
+            setUploadProgress(null);
             // refresh the "My listings" page data
             queryClient.invalidateQueries({ queryKey: ["vendor-listings"] });
         },
+        onError: () => setUploadProgress(null),
     });
 
     // focus the price field, close on Escape, lock page scroll while open
@@ -167,6 +182,18 @@ export default function ListProductModal({ product, categoryName, onClose }: Pro
                         </div>
 
                         <div className="space-y-5 p-5 sm:p-6">
+                            <div className="rounded-xl bg-slate-50 px-4 py-3 text-xs leading-relaxed text-slate-600">
+                                Leave this empty to use the admin product images.
+                                Uploading your own images replaces the admin
+                                gallery for this listing.
+                            </div>
+                            <ProductImageManager
+                                images={images}
+                                onChange={setImages}
+                                uploadProgress={uploadProgress}
+                                disabled={mutation.isPending}
+                            />
+
                             {/* price */}
                             <div>
                                 <label htmlFor="listing-price" className="text-sm font-medium text-slate-900">
@@ -269,7 +296,11 @@ export default function ListProductModal({ product, categoryName, onClose }: Pro
                                 disabled={mutation.isPending}
                                 className={`${goldBtn} disabled:cursor-not-allowed disabled:opacity-60`}
                             >
-                                {mutation.isPending ? "Listing…" : "Create listing"}
+                                {mutation.isPending
+                                    ? images.length > 0
+                                        ? "Uploading…"
+                                        : "Listing…"
+                                    : "Create listing"}
                             </button>
                         </div>
                     </form>

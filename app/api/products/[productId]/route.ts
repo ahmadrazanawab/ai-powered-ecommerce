@@ -10,12 +10,34 @@ import { categorySchema } from "@/app/api/lib/schema/category-schema";
 import { vendors } from "@/app/api/lib/schema/vendor";
 import { vendorProductSchema } from "@/app/api/lib/schema/vendor-product-schema";
 import { effectiveDescription } from "../../lib/schema/resolve-description";
+import {
+    getProductImageGroups,
+    getResolvedProductImages,
+} from "../../lib/product-image-queries";
+import { productImages } from "../../lib/schema/product-image-schema";
+import {
+    buildProductImageRows,
+    cleanupOrphanedProductImages,
+    deleteCloudinaryImages,
+    getProductImageFiles,
+    prepareProductImageManifest,
+    ProductImageStorageError,
+    ProductImageValidationError,
+    uploadProductImageFiles,
+} from "../../lib/product-image-storage";
 
+export const runtime = "nodejs";
 
 export async function PUT(
     req: NextRequest,
     { params }: { params: Promise<{ productId: string }> }
 ) {
+    let uploadedImages: Awaited<
+        ReturnType<typeof uploadProductImageFiles>
+    > = [];
+    let transactionCompleted = false;
+    let removedImages: Array<{ publicId: string | null }> = [];
+
     try {
         // 1. Authenticate admin
         const auth = await verifyAdminToken(req);
@@ -42,6 +64,9 @@ export async function PUT(
 
         // 4. Read form data
         const formData = await req.formData();
+        const files = getProductImageFiles(formData);
+        const hasImageChange =
+            formData.has("imageManifest") || files.length > 0;
 
         const isActiveValue =
             formData.get("isActive") ??
@@ -76,26 +101,15 @@ export async function PUT(
             );
         }
 
-        // 6. Update shared catalog product
-        const [updatedProduct] = await db
-            .update(productSchema)
-            .set({
-                name: result.data.name,
-                slug: result.data.slug,
-                sku: result.data.sku,
-                description: result.data.description,
-                price: result.data.price,
-                stock: result.data.stock,
-                categoryId: result.data.categoryId,
-                ...(result.data.isActive !== undefined
-                    ? { isActive: result.data.isActive }
-                    : {}),
-                updatedAt: new Date(),
+        const [currentProduct] = await db
+            .select({
+                id: productSchema.id,
             })
+            .from(productSchema)
             .where(eq(productSchema.id, productId))
-            .returning();
+            .limit(1);
 
-        if (!updatedProduct) {
+        if (!currentProduct) {
             return NextResponse.json(
                 {
                     success: false,
@@ -103,6 +117,108 @@ export async function PUT(
                 },
                 { status: 404 }
             );
+        }
+
+        const existingImages = hasImageChange
+            ? await db
+                  .select({
+                      id: productImages.id,
+                      imageUrl: productImages.imageUrl,
+                      publicId: productImages.publicId,
+                      sortOrder: productImages.sortOrder,
+                      isPrimary: productImages.isPrimary,
+                  })
+                  .from(productImages)
+                  .where(
+                      and(
+                          eq(productImages.productId, productId),
+                          eq(productImages.source, "admin")
+                      )
+                  )
+            : [];
+        const manifest = hasImageChange
+            ? prepareProductImageManifest(formData, files, existingImages)
+            : [];
+
+        if (files.length > 0) {
+            uploadedImages = await uploadProductImageFiles(
+                files,
+                `aiecommerce/products/${productId}`
+            );
+        }
+
+        const imageRows = hasImageChange
+            ? buildProductImageRows(
+                  { source: "admin", productId },
+                  manifest,
+                  existingImages,
+                  uploadedImages
+              ).images
+            : [];
+        const primaryImageUrl = imageRows.find((image) => image.isPrimary)?.imageUrl;
+
+        const updatedProduct = await db.transaction(async (tx) => {
+            const [updated] = await tx
+                .update(productSchema)
+                .set({
+                    name: result.data.name,
+                    slug: result.data.slug,
+                    sku: result.data.sku,
+                    description: result.data.description,
+                    price: result.data.price,
+                    stock: result.data.stock,
+                    categoryId: result.data.categoryId,
+                    ...(result.data.isActive !== undefined
+                        ? { isActive: result.data.isActive }
+                        : {}),
+                    ...(hasImageChange ? { imageUrl: primaryImageUrl ?? null } : {}),
+                    updatedAt: new Date(),
+                })
+                .where(eq(productSchema.id, productId))
+                .returning();
+
+            if (!updated || !hasImageChange) {
+                return updated;
+            }
+
+            await tx
+                .delete(productImages)
+                .where(
+                    and(
+                        eq(productImages.productId, productId),
+                        eq(productImages.source, "admin")
+                    )
+                );
+
+            if (imageRows.length > 0) {
+                await tx.insert(productImages).values(imageRows);
+            }
+
+            return updated;
+        });
+        transactionCompleted = Boolean(updatedProduct);
+
+        if (!updatedProduct) {
+            if (uploadedImages.length > 0) {
+                await deleteCloudinaryImages(uploadedImages);
+            }
+
+            return NextResponse.json(
+                { success: false, message: "Product not found" },
+                { status: 404 }
+            );
+        }
+
+        if (hasImageChange) {
+            const selectedIds = new Set(
+                manifest.flatMap((entry) =>
+                    entry.existingId ? [entry.existingId] : []
+                )
+            );
+            removedImages = existingImages
+                .filter((image) => !selectedIds.has(image.id))
+                .map((image) => ({ publicId: image.publicId }));
+            await cleanupOrphanedProductImages(removedImages);
         }
 
         return NextResponse.json(
@@ -115,6 +231,24 @@ export async function PUT(
         );
     } catch (error) {
         console.error("UPDATE_PRODUCT_ERROR:", error);
+
+        if (uploadedImages.length > 0 && !transactionCompleted) {
+            await deleteCloudinaryImages(uploadedImages);
+        }
+
+        if (error instanceof ProductImageValidationError) {
+            return NextResponse.json(
+                { success: false, message: error.message },
+                { status: 400 }
+            );
+        }
+
+        if (error instanceof ProductImageStorageError) {
+            return NextResponse.json(
+                { success: false, message: error.message },
+                { status: 502 }
+            );
+        }
 
         const dbError = error as { code?: string };
 
@@ -335,13 +469,40 @@ export async function GET(
             );
         }
 
+        const imageGroups = await getProductImageGroups(
+            [product.productId],
+            offers.map((offer) => offer.listingId)
+        );
+        const images = getResolvedProductImages(
+            imageGroups,
+            product.productId,
+            null,
+            product.imageUrl
+        );
+        const offersWithImages = offers.map((offer) => {
+            const offerImages = getResolvedProductImages(
+                imageGroups,
+                product.productId,
+                offer.listingId,
+                product.imageUrl
+            );
+
+            return {
+                ...offer,
+                images: offerImages,
+                imageUrl: offerImages[0]?.url ?? null,
+            };
+        });
+
         return NextResponse.json(
             {
                 success: true,
                 message: "Product details fetched successfully",
                 data: {
                     ...product,
-                    offers,
+                    images,
+                    imageUrl: images[0]?.url ?? null,
+                    offers: offersWithImages,
                 },
             },
             { status: 200 }
