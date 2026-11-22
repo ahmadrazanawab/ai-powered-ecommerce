@@ -81,10 +81,10 @@ const fieldCls =
     "h-12 w-full rounded-xl bg-white text-sm text-slate-900 ring-1 ring-slate-200 placeholder:text-slate-500 transition focus:outline-none focus:ring-2 focus:ring-amber-400/70";
 
 const darkBtn =
-    "inline-flex h-10 items-center justify-center gap-1.5 rounded-xl bg-slate-950 px-3 text-xs font-semibold text-amber-300 transition hover:bg-slate-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-400 focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:bg-slate-200 disabled:text-slate-400 sm:text-sm";
+    "inline-flex h-11 w-full min-w-0 items-center justify-center gap-1.5 rounded-xl bg-slate-950 px-1.5 text-xs font-semibold text-amber-300 transition hover:bg-slate-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-400 focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:bg-slate-200 disabled:text-slate-400 sm:px-3 sm:text-sm lg:h-10";
 
 const goldSmBtn =
-    "inline-flex h-10 items-center justify-center rounded-xl bg-gradient-to-br from-amber-200 to-amber-400 px-3 text-xs font-semibold text-slate-950 transition hover:from-amber-100 hover:to-amber-300 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-400 focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:from-slate-200 disabled:to-slate-200 disabled:text-slate-400 sm:text-sm";
+    "inline-flex h-11 w-full min-w-0 items-center justify-center rounded-xl bg-gradient-to-br from-amber-200 to-amber-400 px-1.5 text-xs font-semibold text-slate-950 transition hover:from-amber-100 hover:to-amber-300 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-400 focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:from-slate-200 disabled:to-slate-200 disabled:text-slate-400 sm:px-3 sm:text-sm lg:h-10";
 
 const Svg = ({
     children,
@@ -356,7 +356,7 @@ function ProductCard({ product }: { product: ProductI }) {
                     {formatPrice(product.price)}
                 </p>
 
-                <div className="mt-3 grid grid-cols-1 gap-2 min-[420px]:grid-cols-2">
+                <div className="mt-3 grid grid-cols-1 gap-2 md:grid-cols-2">
                     <button
                         type="button"
                         disabled={a.outOfStock || a.addToCart.isPending}
@@ -471,7 +471,7 @@ function FeaturedArrival({ product }: { product: ProductI }) {
                         type="button"
                         disabled={a.outOfStock || a.addToCart.isPending}
                         onClick={a.buyNow}
-                        className={`${goldBtn} disabled:cursor-not-allowed disabled:from-slate-200 disabled:to-slate-200 disabled:text-slate-400 disabled:shadow-none`}
+                        className={`${goldBtn} w-full sm:w-auto disabled:cursor-not-allowed disabled:from-slate-200 disabled:to-slate-200 disabled:text-slate-400 disabled:shadow-none`}
                     >
                         Buy now
                     </button>
@@ -480,7 +480,7 @@ function FeaturedArrival({ product }: { product: ProductI }) {
                         type="button"
                         disabled={a.outOfStock || a.addToCart.isPending}
                         onClick={a.add}
-                        className="inline-flex h-12 items-center justify-center gap-2 rounded-xl bg-slate-950 px-7 text-sm font-semibold text-amber-300 transition hover:bg-slate-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-400 focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:bg-slate-200 disabled:text-slate-400"
+                        className="inline-flex h-12 w-full items-center justify-center gap-2 rounded-xl bg-slate-950 px-7 text-sm font-semibold text-amber-300 transition hover:bg-slate-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-400 focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:bg-slate-200 disabled:text-slate-400 sm:w-auto"
                     >
                         <BagIcon />
                         {a.addToCart.isPending

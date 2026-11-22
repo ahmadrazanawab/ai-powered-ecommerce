@@ -537,7 +537,7 @@ function ProductDetailContent() {
                             <button
                                 type="submit"
                                 disabled={outOfStock || addToCart.isPending}
-                                className={`${goldBtn} flex-1`}
+                                className={`${goldBtn} min-w-0 w-full flex-none sm:w-auto sm:flex-1`}
                             >
                                 <Svg className="h-5 w-5">
                                     <path d="M6 7h12l-1 12H7L6 7Z" />

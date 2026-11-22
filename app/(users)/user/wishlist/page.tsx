@@ -347,13 +347,13 @@ function WishlistCard({
                         {removing ? "Removing…" : "Remove"}
                     </button>
                 ) : (
-                    <div className="mt-3 grid grid-cols-1 gap-2 min-[420px]:grid-cols-2">
+                    <div className="mt-3 grid grid-cols-1 gap-2 md:grid-cols-2">
                         <button
                             type="button"
                             disabled={disabled}
                             onClick={handleAdd}
                             aria-label={`Add ${name} to cart`}
-                            className="inline-flex h-10 items-center justify-center gap-1.5 rounded-xl bg-slate-950 px-3 text-xs font-semibold text-amber-300 transition hover:bg-slate-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-400 focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:bg-slate-200 disabled:text-slate-400 sm:text-sm"
+                            className="inline-flex h-11 w-full min-w-0 items-center justify-center gap-1.5 rounded-xl bg-slate-950 px-1.5 text-xs font-semibold text-amber-300 transition hover:bg-slate-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-400 focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:bg-slate-200 disabled:text-slate-400 sm:px-3 sm:text-sm lg:h-10"
                         >
                             <BagIcon />
                             {addToCart.isPending
@@ -368,7 +368,7 @@ function WishlistCard({
                             disabled={disabled}
                             onClick={handleBuyNow}
                             aria-label={`Buy ${name} now`}
-                            className="inline-flex h-10 items-center justify-center rounded-xl bg-gradient-to-br from-amber-200 to-amber-400 px-3 text-xs font-semibold text-slate-950 transition hover:from-amber-100 hover:to-amber-300 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-400 focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:from-slate-200 disabled:to-slate-200 disabled:text-slate-400 sm:text-sm"
+                            className="inline-flex h-11 w-full min-w-0 items-center justify-center rounded-xl bg-gradient-to-br from-amber-200 to-amber-400 px-1.5 text-xs font-semibold text-slate-950 transition hover:from-amber-100 hover:to-amber-300 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-400 focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:from-slate-200 disabled:to-slate-200 disabled:text-slate-400 sm:px-3 sm:text-sm lg:h-10"
                         >
                             Buy now
                         </button>
