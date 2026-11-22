@@ -1,7 +1,11 @@
 import { NextResponse } from "next/server";
 import { getUserSession } from "../auth/user/get-user-session";
 
-export async function requireCustomer() {
+type CustomerAuth =
+  | { customerId: null; response: NextResponse }
+  | { customerId: string; response: null };
+
+export async function requireCustomer(): Promise<CustomerAuth> {
   const session = await getUserSession();
 
   if (!session) {

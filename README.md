@@ -18,6 +18,17 @@ Open [http://localhost:3000](http://localhost:3000) with your browser to see the
 
 You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
 
+## Payments
+
+Copy `.env.example` to `.env` and configure `RAZORPAY_KEY_ID`,
+`RAZORPAY_KEY_SECRET`, and `RAZORPAY_WEBHOOK_SECRET` on the server. Use Razorpay
+Test Mode keys while developing; never prefix the secret or webhook secret with
+`NEXT_PUBLIC_`.
+
+Configure the Razorpay webhook URL as `/api/webhooks/razorpay` and subscribe to
+`payment.captured` and `payment.failed`. Apply schema changes with
+`npx drizzle-kit migrate`.
+
 This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
 
 ## Learn More

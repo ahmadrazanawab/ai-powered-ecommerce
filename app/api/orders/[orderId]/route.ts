@@ -17,7 +17,7 @@ export async function GET(
 ) {
     try {
         const auth = await requireCustomer();
-        if (!auth.customerId) return auth.response;
+        if (auth.customerId === null) return auth.response;
 
         const { orderId } = await params;
 

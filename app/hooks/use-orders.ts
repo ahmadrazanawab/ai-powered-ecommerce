@@ -64,6 +64,7 @@ export interface OrderI {
     status: OrderStatus;
     paymentStatus: PaymentStatus;
     paymentIntentId: string | null;
+    paymentSessionId: string | null;
     paymentMethod: "cod" | "online";
     createdAt: string;
     updatedAt: string;

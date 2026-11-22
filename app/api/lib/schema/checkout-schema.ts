@@ -96,6 +96,10 @@ export const orders = pgTable(
             .notNull().default("pending"),
         paymentIntentId: text("payment_intent_id").unique(),
 
+        paymentSessionId: text("payment_session_id").unique(),
+        razorpayOrderId: text("razorpay_order_id").unique(),
+        razorpayPaymentId: text("razorpay_payment_id").unique(),
+
         reservationExpiresAt: timestamp("reservation_expires_at", {
             withTimezone: true,
             mode: "date",

@@ -9,7 +9,7 @@ import { requireCustomer } from "@/app/api/lib/customer-auth";
 export async function GET() {
     try {
         const auth = await requireCustomer();
-        if (!auth.customerId) return auth.response;
+        if (auth.customerId === null) return auth.response;
 
         const rows = await db
             .select()

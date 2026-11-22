@@ -4,7 +4,12 @@
 import { useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useForm } from "react-hook-form";
+import {
+    useForm,
+    type FieldErrors,
+    type RegisterOptions,
+    type UseFormRegister,
+} from "react-hook-form";
 import { useCart, type CartItemI } from "@/app/hooks/use-cart";
 import {
     useAddresses,
@@ -13,6 +18,7 @@ import {
     type AddressI,
     type AddressInput,
 } from "@/app/hooks/use-checkout";
+import { startRazorpayCheckout } from "@/app/lib/razorpay-checkout";
 
 const CURRENCY = "₹"; // orders are charged in INR
 
@@ -25,7 +31,15 @@ const goldBtn =
 const fieldCls =
     "h-12 w-full rounded-xl bg-white px-4 text-sm text-slate-900 ring-1 ring-slate-200 placeholder:text-slate-500 transition focus:outline-none focus:ring-2 focus:ring-amber-400/70";
 
-type HttpErrorLike = { response?: { status?: number; data?: { message?: string } } };
+type HttpErrorLike = {
+    response?: {
+        status?: number;
+        data?: {
+            message?: string;
+            data?: { orderId?: string };
+        };
+    };
+};
 
 function formatPrice(value: string | number | undefined) {
     const n = Number(value);
@@ -34,6 +48,38 @@ function formatPrice(value: string | number | undefined) {
         minimumFractionDigits: 2,
         maximumFractionDigits: 2,
     })}`;
+}
+
+function AddressField({
+    name,
+    label,
+    placeholder,
+    rules,
+    span2,
+    register,
+    errors,
+}: {
+    name: keyof AddressInput;
+    label: string;
+    placeholder?: string;
+    rules?: RegisterOptions<AddressInput, keyof AddressInput>;
+    span2?: boolean;
+    register: UseFormRegister<AddressInput>;
+    errors: FieldErrors<AddressInput>;
+}) {
+    return (
+        <div className={span2 ? "sm:col-span-2" : ""}>
+            <label htmlFor={name} className="mb-1.5 block text-xs font-medium text-slate-700">
+                {label}
+            </label>
+            <input id={name} placeholder={placeholder} className={fieldCls} {...register(name, rules)} />
+            {errors[name] && (
+                <p role="alert" className="mt-1 text-xs text-rose-600">
+                    {errors[name]?.message as string}
+                </p>
+            )}
+        </div>
+    );
 }
 
 /* ---------- add address form ---------- */
@@ -61,36 +107,12 @@ function AddressForm({
 
     const err = (create.error as HttpErrorLike | null)?.response?.data?.message;
 
-    const Field = ({
-        name,
-        label,
-        placeholder,
-        rules,
-        span2,
-    }: {
-        name: keyof AddressInput;
-        label: string;
-        placeholder?: string;
-        rules?: Parameters<typeof register>[1];
-        span2?: boolean;
-    }) => (
-        <div className={span2 ? "sm:col-span-2" : ""}>
-            <label htmlFor={name} className="mb-1.5 block text-xs font-medium text-slate-700">
-                {label}
-            </label>
-            <input id={name} placeholder={placeholder} className={fieldCls} {...register(name, rules)} />
-            {errors[name] && (
-                <p role="alert" className="mt-1 text-xs text-rose-600">
-                    {errors[name]?.message as string}
-                </p>
-            )}
-        </div>
-    );
-
     return (
         <form onSubmit={handleSubmit(onSubmit)} noValidate className="mt-5 grid gap-4 sm:grid-cols-2">
-            <Field name="fullName" label="Full name" rules={{ required: "Full name is required" }} />
-            <Field
+            <AddressField register={register} errors={errors} name="fullName" label="Full name" rules={{ required: "Full name is required" }} />
+            <AddressField
+                register={register}
+                errors={errors}
                 name="phone"
                 label="Phone"
                 rules={{
@@ -98,19 +120,21 @@ function AddressForm({
                     pattern: { value: /^\+?[0-9\s-]{10,15}$/, message: "Enter a valid phone number" },
                 }}
             />
-            <Field name="addressLine1" label="Address line 1" span2 rules={{ required: "Address is required" }} />
-            <Field name="addressLine2" label="Address line 2 (optional)" span2 />
-            <Field name="city" label="City" rules={{ required: "City is required" }} />
-            <Field name="state" label="State" rules={{ required: "State is required" }} />
-            <Field
+            <AddressField register={register} errors={errors} name="addressLine1" label="Address line 1" span2 rules={{ required: "Address is required" }} />
+            <AddressField register={register} errors={errors} name="addressLine2" label="Address line 2 (optional)" span2 />
+            <AddressField register={register} errors={errors} name="city" label="City" rules={{ required: "City is required" }} />
+            <AddressField register={register} errors={errors} name="state" label="State" rules={{ required: "State is required" }} />
+            <AddressField
+                register={register}
+                errors={errors}
                 name="postalCode"
-                label="Postal code"
+                label="Pin code"
                 rules={{
                     required: "Postal code is required",
                     pattern: { value: /^\d{6}$/, message: "Enter a 6 digit PIN code" },
                 }}
             />
-            <Field name="country" label="Country" />
+            <AddressField register={register} errors={errors} name="country" label="Country" />
 
             {err && (
                 <p role="alert" className="rounded-xl bg-rose-50 px-4 py-3 text-xs text-rose-700 sm:col-span-2">
@@ -146,6 +170,8 @@ export default function CheckoutPage() {
     const [selectedId, setSelectedId] = useState<string | null>(null);
     const [showForm, setShowForm] = useState(false);
     const [placed, setPlaced] = useState(false); // avoids a flash of "cart is empty" after the order
+    const [paymentMethod, setPaymentMethod] = useState<"cod" | "online">("cod");
+    const [paymentStarting, setPaymentStarting] = useState(false);
 
     const items: CartItemI[] = Array.isArray(cart.data?.data?.items) ? cart.data.data.items : [];
     const totalItems: number = cart.data?.data?.totalItems ?? 0;
@@ -160,17 +186,65 @@ export default function CheckoutPage() {
         (cart.error as HttpErrorLike | null)?.response?.status === 401 ||
         (addressesQ.error as HttpErrorLike | null)?.response?.status === 401;
 
-    const placeOrder = () => {
+    const placeOrder = async () => {
         if (!activeId) return;
-        checkout.mutate(
-            { addressId: activeId, paymentMethod: "cod" },
-            {
-                onSuccess: (res) => {
-                    setPlaced(true);
-                    router.replace(`/user/order-success/${res.data.orderId}`);
-                },
+
+        try {
+            const response = await checkout.mutateAsync({
+                addressId: activeId,
+                paymentMethod,
+            });
+            const orderId = response.data?.orderId;
+
+            if (!orderId) {
+                throw new Error("Checkout did not return an order ID");
             }
-        );
+
+            setPlaced(true);
+
+            if (paymentMethod === "cod") {
+                router.replace(`/user/order-success/${orderId}`);
+                return;
+            }
+
+            setPaymentStarting(true);
+            try {
+                const paymentResult = await startRazorpayCheckout({
+                    orderId,
+                    keyId: response.data.keyId,
+                    razorpayOrderId: response.data.razorpayOrderId,
+                    amount: response.data.amount,
+                    currency: response.data.currency,
+                });
+
+                if (paymentResult.kind === "paid") {
+                    router.replace(`/user/order-success/${orderId}`);
+                    return;
+                }
+
+                const paymentState =
+                    paymentResult.kind === "cancelled"
+                        ? "cancelled"
+                        : "failed";
+                router.replace(
+                    `/user/order-success/${orderId}?payment=${paymentState}`
+                );
+            } catch {
+                router.replace(
+                    `/user/order-success/${orderId}?payment=verification`
+                );
+            } finally {
+                setPaymentStarting(false);
+            }
+        } catch (error) {
+            const orderId = (error as HttpErrorLike).response?.data?.data?.orderId;
+            if (orderId) {
+                setPlaced(true);
+                router.replace(
+                    `/user/order-success/${orderId}?payment=unavailable`
+                );
+            }
+        }
     };
 
     const checkoutError = (checkout.error as HttpErrorLike | null)?.response?.data?.message;
@@ -292,14 +366,43 @@ export default function CheckoutPage() {
                     {/* payment */}
                     <section className={`${cardCls} p-6`}>
                         <h2 className="text-lg font-semibold text-slate-900">Payment</h2>
-                        <div className="mt-4 flex items-center gap-3 rounded-2xl bg-slate-950 p-4 text-white">
-                            <span className="grid h-5 w-5 place-items-center rounded-full bg-amber-300">
-                                <span className="h-2 w-2 rounded-full bg-slate-950" />
-                            </span>
-                            <span>
-                                <span className="block text-sm font-medium">Cash on delivery</span>
-                                <span className="block text-xs text-slate-300">Pay when your order arrives</span>
-                            </span>
+                        <div className="mt-4 grid gap-3">
+                            <button
+                                type="button"
+                                role="radio"
+                                aria-checked={paymentMethod === "cod"}
+                                onClick={() => setPaymentMethod("cod")}
+                                className={`flex items-center gap-3 rounded-2xl p-4 text-left transition ${paymentMethod === "cod"
+                                    ? "bg-slate-950 text-white ring-1 ring-slate-950"
+                                    : "bg-white text-slate-900 ring-1 ring-slate-200 hover:bg-slate-50"
+                                    }`}
+                            >
+                                <span className={`grid h-5 w-5 place-items-center rounded-full ${paymentMethod === "cod" ? "bg-amber-300" : "ring-1 ring-slate-300"}`}>
+                                    {paymentMethod === "cod" && <span className="h-2 w-2 rounded-full bg-slate-950" />}
+                                </span>
+                                <span>
+                                    <span className="block text-sm font-medium">Cash on delivery</span>
+                                    <span className={`block text-xs ${paymentMethod === "cod" ? "text-slate-300" : "text-slate-500"}`}>Pay when your order arrives</span>
+                                </span>
+                            </button>
+                            <button
+                                type="button"
+                                role="radio"
+                                aria-checked={paymentMethod === "online"}
+                                onClick={() => setPaymentMethod("online")}
+                                className={`flex items-center gap-3 rounded-2xl p-4 text-left transition ${paymentMethod === "online"
+                                    ? "bg-slate-950 text-white ring-1 ring-slate-950"
+                                    : "bg-white text-slate-900 ring-1 ring-slate-200 hover:bg-slate-50"
+                                    }`}
+                            >
+                                <span className={`grid h-5 w-5 place-items-center rounded-full ${paymentMethod === "online" ? "bg-amber-300" : "ring-1 ring-slate-300"}`}>
+                                    {paymentMethod === "online" && <span className="h-2 w-2 rounded-full bg-slate-950" />}
+                                </span>
+                                <span>
+                                    <span className="block text-sm font-medium">Online payment</span>
+                                    <span className={`block text-xs ${paymentMethod === "online" ? "text-slate-300" : "text-slate-500"}`}>Pay securely with Razorpay</span>
+                                </span>
+                            </button>
                         </div>
                     </section>
                 </div>
@@ -351,10 +454,14 @@ export default function CheckoutPage() {
                     <button
                         type="button"
                         onClick={placeOrder}
-                        disabled={!activeId || formOpen || hasProblem || checkout.isPending}
+                        disabled={!activeId || formOpen || hasProblem || checkout.isPending || paymentStarting}
                         className={`${goldBtn} mt-5 w-full`}
                     >
-                        {checkout.isPending ? "Placing order…" : "Place order"}
+                        {checkout.isPending || paymentStarting
+                            ? "Placing order…"
+                            : paymentMethod === "online"
+                                ? "Continue to payment"
+                                : "Place order"}
                     </button>
                 </aside>
             </div>

@@ -19,7 +19,7 @@ export async function POST(
 ) {
     try {
         const auth = await requireCustomer();
-        if (!auth.customerId) return auth.response;
+        if (auth.customerId === null) return auth.response;
 
         const { orderId } = await params;
 
@@ -37,6 +37,10 @@ export async function POST(
                 .limit(1);
 
             if (!order) return { error: "NOT_FOUND" as const };
+
+            if (order.paymentMethod === "online") {
+                return { error: "CANNOT_CANCEL" as const };
+            }
 
             if (!["pending", "confirmed"].includes(order.status)) {
                 return { error: "CANNOT_CANCEL" as const };

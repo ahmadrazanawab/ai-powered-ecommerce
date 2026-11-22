@@ -9,7 +9,7 @@ type Context = { params: Promise<{ addressId: string }> };
 export async function PATCH(request: NextRequest, { params }: Context) {
   try {
     const auth = await requireCustomer();
-    if (!auth.customerId) return auth.response;
+    if (auth.customerId === null) return auth.response;
 
     const { addressId } = await params;
     const body = await request.json();
@@ -77,7 +77,7 @@ export async function PATCH(request: NextRequest, { params }: Context) {
 export async function DELETE(_request: NextRequest, { params }: Context) {
   try {
     const auth = await requireCustomer();
-    if (!auth.customerId) return auth.response;
+    if (auth.customerId === null) return auth.response;
 
     const { addressId } = await params;
 

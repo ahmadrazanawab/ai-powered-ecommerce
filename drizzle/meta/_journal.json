@@ -22,6 +22,27 @@
       "when": 1795274413703,
       "tag": "0002_puzzling_madame_web",
       "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "7",
+      "when": 1795320000000,
+      "tag": "0003_stripe_checkout_sessions",
+      "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "7",
+      "when": 1795340322133,
+      "tag": "0004_early_inertia",
+      "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "7",
+      "when": 1795342431919,
+      "tag": "0005_add_razorpay_order_tracking",
+      "breakpoints": true
     }
   ]
 }

@@ -126,7 +126,7 @@ export async function POST(request: NextRequest) {
 export async function GET() {
   try {
     const auth = await requireCustomer();
-    if (!auth.customerId) return auth.response;
+    if (auth.customerId === null) return auth.response;
 
     const data = await db
       .select({

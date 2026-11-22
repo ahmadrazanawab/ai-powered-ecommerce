@@ -11,7 +11,7 @@ export async function GET() {
     try {
         const auth = await requireCustomer();
 
-        if (!auth.customerId) {
+        if (auth.customerId === null) {
             return auth.response;
         }
 
@@ -42,7 +42,7 @@ export async function POST(request: NextRequest) {
     try {
         const auth = await requireCustomer();
 
-        if (!auth.customerId) {
+        if (auth.customerId === null) {
             return auth.response;
         }
 

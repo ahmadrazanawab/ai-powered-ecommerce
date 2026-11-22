@@ -1,5 +1,5 @@
 
-import { and, eq, lt, sql } from "drizzle-orm";
+import { and, eq, inArray, lt, sql } from "drizzle-orm";
 
 import { db } from "@/app/api/lib/db";
 import {
@@ -18,6 +18,7 @@ export async function releaseExpiredReservation(
         id: orders.id,
         status: orders.status,
         paymentStatus: orders.paymentStatus,
+        paymentMethod: orders.paymentMethod,
         reservationExpiresAt: orders.reservationExpiresAt,
       })
       .from(orders)
@@ -28,8 +29,10 @@ export async function releaseExpiredReservation(
     // Only release stock for an expired, unpaid pending order.
     if (
       !order ||
-      order.status !== "pending_payment" ||
-      order.paymentStatus !== "pending" ||
+      order.status !== "pending" ||
+      order.paymentMethod !== "online" ||
+      !["pending", "failed"].includes(order.paymentStatus) ||
+      !order.reservationExpiresAt ||
       order.reservationExpiresAt >= new Date()
     ) {
       return false;
@@ -38,7 +41,9 @@ export async function releaseExpiredReservation(
     const items = await tx
       .select({
         listingId: orderItems.listingId,
+        id: orderItems.id,
         quantity: orderItems.quantity,
+        stockRestored: orderItems.stockRestored,
       })
       .from(orderItems)
       .where(eq(orderItems.orderId, orderId));
@@ -52,6 +57,8 @@ export async function releaseExpiredReservation(
 
     // Restore each vendor listing's reserved stock.
     for (const item of items) {
+      if (item.stockRestored) continue;
+
       const [updatedListing] = await tx
         .update(vendorProductSchema)
         .set({
@@ -67,21 +74,27 @@ export async function releaseExpiredReservation(
           `Vendor listing ${item.listingId} not found while releasing order ${orderId}`
         );
       }
+
+      await tx
+        .update(orderItems)
+        .set({ stockRestored: true })
+        .where(eq(orderItems.id, item.id));
     }
 
     // Mark the order as expired/failed in the same transaction.
     const [updatedOrder] = await tx
       .update(orders)
       .set({
-        status: "payment_failed",
+        status: "cancelled",
         paymentStatus: "failed",
         updatedAt: new Date(),
       })
       .where(
         and(
           eq(orders.id, orderId),
-          eq(orders.status, "pending_payment"),
-          eq(orders.paymentStatus, "pending"),
+          eq(orders.status, "pending"),
+          eq(orders.paymentMethod, "online"),
+          inArray(orders.paymentStatus, ["pending", "failed"]),
           lt(orders.reservationExpiresAt, new Date())
         )
       )

@@ -40,7 +40,7 @@ export function useCreateAddress() {
 export function useCheckout() {
     const queryClient = useQueryClient();
     return useMutation({
-        mutationFn: async (input: { addressId: string; paymentMethod: "cod" }) =>
+        mutationFn: async (input: { addressId: string; paymentMethod: "cod" | "online" }) =>
             (await api.post("/api/checkout", input)).data,
         onSuccess: () => {
             // cart is emptied and stock changed on the server
