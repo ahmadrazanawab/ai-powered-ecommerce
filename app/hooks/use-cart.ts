@@ -29,9 +29,18 @@ export interface CartItemI {
     lineTotal?: string;
 }
 
+export interface CartResponseI {
+    success: boolean;
+    data: {
+        items: CartItemI[];
+        totalItems: number;
+        subtotal: string;
+    };
+}
+
 /** Cart contents. Response: { success, data: { items, totalItems, subtotal } } */
 export function useCart() {
-    return useQuery({
+    return useQuery<CartResponseI>({
         queryKey: ["cart"],
         queryFn: async () => (await api.get("/api/cart")).data,
         staleTime: 60 * 1000,
@@ -74,7 +83,47 @@ export function useRemoveCartItem() {
     return useMutation({
         mutationFn: async (itemId: string) =>
             (await api.delete(`/api/cart/items/${itemId}`)).data,
-        onSuccess: () => {
+        onMutate: async (itemId) => {
+            await queryClient.cancelQueries({ queryKey: ["cart"] });
+            const previousCart = queryClient.getQueryData<CartResponseI>(["cart"]);
+
+            queryClient.setQueryData<CartResponseI>(["cart"], (current) => {
+                if (!current) return current;
+
+                const items = current.data.items.filter(
+                    (item) => item.cartItemId !== itemId
+                );
+
+                if (items.length === current.data.items.length) return current;
+
+                return {
+                    ...current,
+                    data: {
+                        ...current.data,
+                        items,
+                        totalItems: items.reduce(
+                            (total, item) =>
+                                total + (item.name === undefined ? 0 : item.quantity),
+                            0
+                        ),
+                        subtotal: items
+                            .reduce(
+                                (total, item) => total + Number(item.lineTotal ?? 0),
+                                0
+                            )
+                            .toFixed(2),
+                    },
+                };
+            });
+
+            return { previousCart };
+        },
+        onError: (_error, _itemId, context) => {
+            if (context?.previousCart) {
+                queryClient.setQueryData(["cart"], context.previousCart);
+            }
+        },
+        onSettled: () => {
             queryClient.invalidateQueries({ queryKey: ["cart"] });
         },
     });

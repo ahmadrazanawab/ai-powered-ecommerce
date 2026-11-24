@@ -6,6 +6,7 @@ import { usePathname } from "next/navigation";
 import { useQuery } from "@tanstack/react-query";
 import { api } from "@/app/lib/axios";
 import { useUserSession } from "@/app/hooks/use-user-session";
+import { useCart } from "@/app/hooks/use-cart";
 
 /* ---------- edit these to match your store ---------- */
 const BRAND = "Aurelia";
@@ -29,7 +30,6 @@ interface CategoryI {
 type NavbarUser = { name: string; email?: string } | null;
 
 interface NavbarProps {
-    cartCount?: number;
     wishlistCount?: number;
     user?: NavbarUser;
     onLogout?: () => void;
@@ -112,7 +112,6 @@ const goldBtn =
     "inline-flex h-10 items-center justify-center rounded-xl bg-gradient-to-br from-amber-200 to-amber-400 px-5 text-sm font-semibold text-slate-950 shadow-lg shadow-amber-400/20 transition hover:from-amber-100 hover:to-amber-300";
 
 export default function Navbar({
-    cartCount = 0,
     wishlistCount = 0,
     user = null,
     onLogout,
@@ -123,6 +122,8 @@ export default function Navbar({
     const [openMenu, setOpenMenu] = useState<"categories" | "account" | null>(null);
     const [mobileCatsOpen, setMobileCatsOpen] = useState(false);
     const [announcementOpen, setAnnouncementOpen] = useState(true);
+    const { data: cartData } = useCart();
+    const cartCount = cartData?.data?.totalItems ?? 0;
 
     /* Categories for the dropdown (public GET, shared cache with the admin page) */
     const { data, isPending } = useQuery({
