@@ -16,10 +16,11 @@ export interface CatalogProductI {
 interface Props {
     product: CatalogProductI;
     categoryName?: string;
+    alreadyListed: boolean;
     onList: (product: CatalogProductI) => void;
 }
 
-export default function CatalogCard({ product, categoryName, onList }: Props) {
+export default function CatalogCard({ product, categoryName, alreadyListed, onList }: Props) {
     return (
         <article
             className={`${cardCls} group flex flex-col overflow-hidden transition-all duration-300 hover:-translate-y-1 hover:shadow-[0_28px_70px_-20px_rgba(15,23,42,0.3)]`}
@@ -66,12 +67,19 @@ export default function CatalogCard({ product, categoryName, onList }: Props) {
                 <button
                     type="button"
                     onClick={() => onList(product)}
-                    className="mt-4 inline-flex h-11 w-full items-center justify-center gap-2 rounded-xl bg-slate-950 text-sm font-semibold text-amber-300 transition hover:bg-slate-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-400 focus-visible:ring-offset-2"
+                    disabled={alreadyListed}
+                    className="mt-4 inline-flex h-11 w-full items-center justify-center gap-2 rounded-xl bg-slate-950 text-sm font-semibold text-amber-300 transition hover:bg-slate-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-400 focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-60"
                 >
-                    <Svg className="h-4 w-4" strokeWidth={2}>
-                        <path d="M12 5v14M5 12h14" />
-                    </Svg>
-                    List this product
+                    {alreadyListed ? (
+                        "Already Listed"
+                    ) : (
+                        <>
+                            <Svg className="h-4 w-4" strokeWidth={2}>
+                                <path d="M12 5v14M5 12h14" />
+                            </Svg>
+                            List this product
+                        </>
+                    )}
                 </button>
             </div>
         </article>

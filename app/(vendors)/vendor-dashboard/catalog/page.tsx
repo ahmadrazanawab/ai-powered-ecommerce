@@ -24,6 +24,10 @@ interface FiltersForm {
     categoryId: string;
 }
 
+interface VendorListingsResponse {
+    data?: { productId: string }[];
+}
+
 const DEFAULT_FILTERS: FiltersForm = { search: "", categoryId: "" };
 
 export default function VendorCatalogPage() {
@@ -50,6 +54,16 @@ export default function VendorCatalogPage() {
         staleTime: 2 * 60 * 1000,
     });
 
+    const {
+        data: listingsData,
+        isPending: listingsPending,
+        isError: listingsError,
+        refetch: refetchListings,
+    } = useQuery<VendorListingsResponse>({
+        queryKey: ["vendor-listings"],
+        queryFn: async () => (await api.get("/api/auth/vendor/products")).data,
+    });
+
     /* category names (the catalog only returns categoryId) */
     const { data: catData } = useQuery({
         queryKey: ["categories"],
@@ -58,7 +72,14 @@ export default function VendorCatalogPage() {
     });
 
     const products: CatalogProductI[] = Array.isArray(data?.data) ? data.data : [];
+    const listedProductIds = new Set(
+        (Array.isArray(listingsData?.data) ? listingsData.data : []).map(
+            (listing) => listing.productId
+        )
+    );
     const categories: CategoryI[] = Array.isArray(catData?.data) ? catData.data : [];
+    const catalogPending = isPending || listingsPending;
+    const catalogError = isError || listingsError;
 
     const categoryName = useMemo(
         () => new Map(categories.map((c) => [c.categoryId, c.name])),
@@ -108,7 +129,7 @@ export default function VendorCatalogPage() {
 
                 <span className="inline-flex w-fit items-center gap-2 rounded-full bg-slate-950 px-4 py-2 text-xs font-medium text-amber-200">
                     <span className="h-1.5 w-1.5 rounded-full bg-amber-300" />
-                    {isPending ? "Loading…" : `${products.length} products`}
+                    {catalogPending ? "Loading…" : `${products.length} products`}
                 </span>
             </div>
 
@@ -165,7 +186,7 @@ export default function VendorCatalogPage() {
             <div className="mt-8">
                 <div className="flex flex-wrap items-center justify-between gap-3">
                     <p className="text-sm text-slate-600" aria-live="polite">
-                        {isPending ? (
+                        {catalogPending ? (
                             "Loading catalog…"
                         ) : (
                             <>
@@ -191,13 +212,13 @@ export default function VendorCatalogPage() {
                 </div>
 
                 <div className="mt-6">
-                    {isPending ? (
+                    {catalogPending ? (
                         <div className="grid gap-4 sm:grid-cols-2 sm:gap-5 lg:grid-cols-3">
                             {Array.from({ length: 6 }).map((_, i) => (
                                 <ProductSkeleton key={i} />
                             ))}
                         </div>
-                    ) : isError ? (
+                    ) : catalogError ? (
                         <div className={`${cardCls} mx-auto max-w-lg p-10 text-center`}>
                             <span className="mx-auto grid h-14 w-14 place-items-center rounded-2xl bg-rose-50 text-rose-600">
                                 <Svg className="h-7 w-7">
@@ -211,7 +232,14 @@ export default function VendorCatalogPage() {
                             <p className="mt-2 text-sm text-slate-600">
                                 Something went wrong. Please check your connection and try again.
                             </p>
-                            <button type="button" onClick={() => refetch()} className={`${goldBtn} mt-6`}>
+                            <button
+                                type="button"
+                                onClick={() => {
+                                    void refetch();
+                                    void refetchListings();
+                                }}
+                                className={`${goldBtn} mt-6`}
+                            >
                                 Try again
                             </button>
                         </div>
@@ -241,6 +269,7 @@ export default function VendorCatalogPage() {
                                     key={p.id}
                                     product={p}
                                     categoryName={categoryName.get(p.categoryId)}
+                                    alreadyListed={listedProductIds.has(p.id)}
                                     onList={setSelected}
                                 />
                             ))}
@@ -248,7 +277,7 @@ export default function VendorCatalogPage() {
                     )}
                 </div>
 
-                {!isPending && !isError && (
+                {!catalogPending && !catalogError && (
                     <Pagination
                         page={currentPage}
                         totalPages={totalPages}

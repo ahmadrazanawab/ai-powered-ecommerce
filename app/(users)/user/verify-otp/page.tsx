@@ -57,6 +57,7 @@ const Page = () => {
 
     const [identifier, setIdentifier] = useState("");
     const [purpose, setPurpose] = useState<"login" | "signup">("login");
+    const [developmentOtp, setDevelopmentOtp] = useState("");
 
     const [apiError, setApiError] = useState("");
 
@@ -98,6 +99,15 @@ const Page = () => {
                 shouldValidate: true,
             });
         }
+
+        if (process.env.NODE_ENV === "development") {
+            const savedOtp = sessionStorage.getItem("development_otp") ?? "";
+            if (/^\d{6}$/.test(savedOtp)) {
+                setDevelopmentOtp(savedOtp);
+            }
+        } else {
+            sessionStorage.removeItem("development_otp");
+        }
     }, [setValue]);
 
     // OTP verification mutation
@@ -126,6 +136,7 @@ const Page = () => {
 
             sessionStorage.removeItem("opt_identifier");
             sessionStorage.removeItem("purpose");
+            sessionStorage.removeItem("development_otp");
 
 
             reset();
@@ -306,6 +317,19 @@ const Page = () => {
                                     )}
                                 />
                             </div>
+
+                            {process.env.NODE_ENV === "development" &&
+                                developmentOtp && (
+                                    <p
+                                        role="status"
+                                        className="mt-3 rounded-lg bg-amber-50 px-3 py-2 text-sm text-amber-900 ring-1 ring-amber-200"
+                                    >
+                                        Development OTP:{" "}
+                                        <code className="select-all rounded bg-white px-1.5 py-0.5 font-mono font-semibold tracking-wider">
+                                            {developmentOtp}
+                                        </code>
+                                    </p>
+                                )}
 
                             {errors.otp && (
                                 <p className="mt-1.5 text-sm text-error">

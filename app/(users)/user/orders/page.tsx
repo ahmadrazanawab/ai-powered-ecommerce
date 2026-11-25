@@ -11,6 +11,7 @@ import {
     type OrderI,
     type OrderStatus,
 } from "@/app/hooks/use-orders";
+import { useOrderInvoices } from "@/app/hooks/use-order-invoices";
 
 /* ---------- config ---------- */
 const PAGE_SIZE = 6;
@@ -262,6 +263,10 @@ function OrderCard({ order }: { order: OrderI }) {
     const [open, setOpen] = useState(false);
     const [confirming, setConfirming] = useState(false);
     const cancel = useCancelOrder();
+    const invoicesQuery = useOrderInvoices(
+        order.id,
+        open && order.status === "delivered"
+    );
 
     const totalQty = order.items.reduce((sum, i) => sum + i.quantity, 0);
     const preview = order.items.slice(0, 4);
@@ -563,6 +568,101 @@ function OrderCard({ order }: { order: OrderI }) {
                         </div>
                     </div>
                 </div>
+            )}
+
+            {open && (
+                <section className="mt-5 border-t border-slate-100 pt-5">
+                    <h3 className="text-sm font-semibold text-slate-900">
+                        Seller invoices
+                    </h3>
+                    {order.status !== "delivered" ? (
+                        <div className="mt-3">
+                            <button
+                                type="button"
+                                disabled
+                                className="inline-flex h-10 cursor-not-allowed items-center rounded-xl bg-slate-100 px-4 text-sm font-medium text-slate-400"
+                            >
+                                Download invoice
+                            </button>
+                            <p className="mt-2 text-xs text-slate-500">
+                                Invoices become available after delivery.
+                            </p>
+                        </div>
+                    ) : invoicesQuery.isPending ? (
+                        <p className="mt-3 text-sm text-slate-500">
+                            Checking invoice availability…
+                        </p>
+                    ) : invoicesQuery.isError ? (
+                        <p role="alert" className="mt-3 text-sm text-rose-600">
+                            We couldn&apos;t load your invoices. Please try again later.
+                        </p>
+                    ) : invoicesQuery.data?.invoices.length ? (
+                        <div className="mt-3">
+                            {invoicesQuery.data.state === "generating" && (
+                                <p
+                                    role="status"
+                                    className="mb-3 text-sm text-slate-500"
+                                >
+                                    Preparing remaining seller invoices…
+                                </p>
+                            )}
+                            <ul className="space-y-2">
+                                {invoicesQuery.data.invoices.map((invoice) => (
+                                <li
+                                    key={invoice.id}
+                                    className="flex flex-wrap items-center justify-between gap-3 rounded-xl bg-slate-50 p-3 ring-1 ring-slate-200/70"
+                                >
+                                    <div>
+                                        <p className="text-sm font-medium text-slate-800">
+                                            {invoice.sellerName}
+                                        </p>
+                                        <p className="text-xs text-slate-500">
+                                            {invoice.invoiceNumber ??
+                                                "Seller invoice"}
+                                        </p>
+                                    </div>
+                                    {invoice.status === "ready" ? (
+                                        <a
+                                            href={`/api/orders/${order.id}/invoices/${invoice.id}/download`}
+                                            className="inline-flex h-9 items-center rounded-lg bg-slate-950 px-3 text-sm font-semibold text-amber-300 transition hover:bg-slate-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-400"
+                                        >
+                                            Download PDF
+                                        </a>
+                                    ) : invoice.status === "generating" ? (
+                                        <span className="text-sm text-slate-500">
+                                            Preparing…
+                                        </span>
+                                    ) : invoice.status === "failed" ? (
+                                        <span className="text-sm text-rose-600">
+                                            Generation failed
+                                        </span>
+                                    ) : (
+                                        <span className="text-sm text-slate-500">
+                                            Not available yet
+                                        </span>
+                                    )}
+                                </li>
+                                ))}
+                            </ul>
+                        </div>
+                    ) : invoicesQuery.data?.state === "generating" ? (
+                        <p role="status" className="mt-3 text-sm text-slate-500">
+                            Your seller invoices are being prepared…
+                        </p>
+                    ) : invoicesQuery.data?.state === "locked" ? (
+                        <p className="mt-3 text-sm text-slate-500">
+                            Invoices become available after delivery.
+                        </p>
+                    ) : invoicesQuery.data?.state === "failed" ? (
+                        <p role="alert" className="mt-3 text-sm text-rose-600">
+                            Invoice generation failed. Please check back later.
+                        </p>
+                    ) : (
+                        <p className="mt-3 text-sm text-slate-500">
+                            No seller invoices are currently available.
+                        </p>
+                    )}
+                </section>
             )}
         </article>
     );

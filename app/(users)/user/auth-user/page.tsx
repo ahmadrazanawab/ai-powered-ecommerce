@@ -15,6 +15,13 @@ import {
 
 type AuthPurpose = "login" | "signup";
 
+interface OtpRequestResponse {
+    success: boolean;
+    message: string;
+    expiresIn: number;
+    developmentOtp?: string;
+}
+
 /*
 message: "Customer login successful"
 success: true
@@ -46,7 +53,7 @@ const Page = () => {
 
     const authMutation = useMutation({
         mutationFn: async (data: UserOtpRequestInput) => {
-            const res = await api.post(
+            const res = await api.post<OtpRequestResponse>(
                 "/api/auth/user/request-otp",
                 data
             );
@@ -54,7 +61,7 @@ const Page = () => {
             return res.data;
         },
 
-        onSuccess: (_, variables) => {
+        onSuccess: (response, variables) => {
             sessionStorage.setItem(
                 "opt_identifier",
                 variables.identifier
@@ -64,6 +71,17 @@ const Page = () => {
                 "purpose",
                 variables.purpose
             );
+
+            const developmentOtp =
+                process.env.NODE_ENV === "development" &&
+                /^\d{6}$/.test(response.developmentOtp ?? "")
+                    ? response.developmentOtp
+                    : null;
+            if (developmentOtp) {
+                sessionStorage.setItem("development_otp", developmentOtp);
+            } else {
+                sessionStorage.removeItem("development_otp");
+            }
 
             router.push("/user/verify-otp");
         },

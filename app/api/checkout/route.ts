@@ -15,6 +15,14 @@ import {
 import { vendorProductSchema } from "@/app/api/lib/schema/vendor-product-schema";
 import { vendors } from "@/app/api/lib/schema/vendor";
 import { productSchema } from "@/app/api/lib/schema/product-schema";
+import { vendorBusinessProfiles } from "@/app/api/lib/schema/vendor-business-profile";
+import { vendorProductTaxProfiles } from "@/app/api/lib/schema/vendor-product-tax-profile";
+import {
+    calculateInclusiveTax,
+    decimalToMinorUnits,
+    isInterstateIndianSupply,
+    minorUnitsToDecimal,
+} from "@/app/api/lib/invoices/money";
 
 const RESERVATION_MINUTES = 30;
 
@@ -159,6 +167,11 @@ export async function POST(request: NextRequest) {
                     price: vendorProductSchema.price,
                     stock: vendorProductSchema.stock,
                     vendorId: vendorProductSchema.vendorId,
+                    sellerState: vendorBusinessProfiles.state,
+                    gstRegistrationStatus:
+                        vendorBusinessProfiles.gstRegistrationStatus,
+                    hsnCode: vendorProductTaxProfiles.hsnCode,
+                    gstRate: vendorProductTaxProfiles.gstRate,
                 })
                 .from(vendorProductSchema)
                 .innerJoin(
@@ -168,6 +181,17 @@ export async function POST(request: NextRequest) {
                 .innerJoin(
                     vendors,
                     eq(vendors.id, vendorProductSchema.vendorId)
+                )
+                .leftJoin(
+                    vendorBusinessProfiles,
+                    eq(vendorBusinessProfiles.vendorId, vendors.id)
+                )
+                .leftJoin(
+                    vendorProductTaxProfiles,
+                    eq(
+                        vendorProductTaxProfiles.vendorProductId,
+                        vendorProductSchema.id
+                    )
                 )
                 .where(
                     and(
@@ -184,7 +208,7 @@ export async function POST(request: NextRequest) {
                 offers.map((offer) => [offer.listingId, offer])
             );
 
-            let subtotalPaise = 0;
+            let subtotalPaise = 0n;
 
             const lines = items.map((item) => {
                 const offer = offerMap.get(item.listingId);
@@ -197,33 +221,69 @@ export async function POST(request: NextRequest) {
                     throw new Error(`INSUFFICIENT_STOCK:${offer.productName}`);
                 }
 
-                // Prices are stored as decimal strings; calculate in integer paise.
-                const pricePaise = Math.round(Number(offer.price) * 100);
-
-                if (!Number.isSafeInteger(pricePaise) || pricePaise <= 0) {
+                const priceValue = decimalToMinorUnits(offer.price);
+                if (priceValue <= 0n) {
                     throw new Error("INVALID_PRICE");
                 }
 
-                const lineTotalPaise = pricePaise * item.quantity;
-
-                if (!Number.isSafeInteger(lineTotalPaise)) {
-                    throw new Error("INVALID_TOTAL");
-                }
+                const lineTotalPaise = priceValue * BigInt(item.quantity);
 
                 subtotalPaise += lineTotalPaise;
+
+                let taxSnapshot = null;
+                let hsnCode: string | null = null;
+                let gstRate: string | null = null;
+
+                if (
+                    offer.gstRegistrationStatus === "regular" &&
+                    offer.hsnCode &&
+                    offer.gstRate
+                ) {
+                    hsnCode = offer.hsnCode;
+                    gstRate = offer.gstRate;
+                    const interstate =
+                        address.country.trim().toLowerCase() === "india" &&
+                        offer.sellerState
+                            ? isInterstateIndianSupply(
+                                  offer.sellerState,
+                                  address.state
+                              )
+                            : null;
+                    if (interstate !== null) {
+                        taxSnapshot = calculateInclusiveTax(
+                            lineTotalPaise,
+                            gstRate,
+                            interstate
+                        );
+                    }
+                } else if (
+                    offer.gstRegistrationStatus === "composition" ||
+                    offer.gstRegistrationStatus === "unregistered"
+                ) {
+                    hsnCode = offer.hsnCode;
+                    gstRate = "0.00";
+                    taxSnapshot = calculateInclusiveTax(
+                        lineTotalPaise,
+                        "0.00",
+                        false
+                    );
+                }
 
                 return {
                     ...item,
                     offer,
-                    pricePaise,
                     lineTotalPaise,
+                    hsnCode,
+                    gstRate,
+                    taxableAmount: taxSnapshot?.taxableAmount ?? null,
+                    cgstAmount: taxSnapshot?.cgstAmount ?? null,
+                    sgstAmount: taxSnapshot?.sgstAmount ?? null,
+                    igstAmount: taxSnapshot?.igstAmount ?? null,
+                    totalTax: taxSnapshot?.totalTax ?? null,
                 };
             });
 
-            if (
-                !Number.isSafeInteger(subtotalPaise) ||
-                subtotalPaise < 1
-            ) {
+            if (subtotalPaise < 1n) {
                 throw new Error("INVALID_TOTAL");
             }
 
@@ -276,7 +336,7 @@ export async function POST(request: NextRequest) {
                     userId: auth.customerId!,
                     addressId: address.id,
                     shippingAddress: shippingSnapshot,
-                    subtotal: (subtotalPaise / 100).toFixed(2),
+                    subtotal: minorUnitsToDecimal(subtotalPaise),
                     currency: "inr",
                     paymentMethod: normalizedPaymentMethod,
                     status: normalizedPaymentMethod === "cod" ? "confirmed" : "pending",
@@ -293,8 +353,15 @@ export async function POST(request: NextRequest) {
                     productId: line.offer.productId,
                     productName: line.offer.productName,
                     quantity: line.quantity,
-                    unitPrice: (line.pricePaise / 100).toFixed(2),
-                    lineTotal: (line.lineTotalPaise / 100).toFixed(2),
+                    unitPrice: line.offer.price,
+                    lineTotal: minorUnitsToDecimal(line.lineTotalPaise),
+                    hsnCode: line.hsnCode,
+                    gstRate: line.gstRate,
+                    taxableAmount: line.taxableAmount,
+                    cgstAmount: line.cgstAmount,
+                    sgstAmount: line.sgstAmount,
+                    igstAmount: line.igstAmount,
+                    totalTax: line.totalTax,
                 }))
             );
 
@@ -323,7 +390,7 @@ export async function POST(request: NextRequest) {
                         paymentMethod: "cod",
                         orderStatus: "confirmed",
                         paymentStatus: "pending",
-                        amount: result.subtotalPaise,
+                        amount: Number(result.subtotalPaise),
                         currency: "inr",
                     },
                 },

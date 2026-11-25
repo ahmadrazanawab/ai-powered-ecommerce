@@ -11,7 +11,8 @@ import {
     unique,
     check,
     jsonb,
-    boolean
+    boolean,
+    varchar
 } from "drizzle-orm/pg-core";
 import { sql } from "drizzle-orm";
 import { users } from "./users";
@@ -148,6 +149,16 @@ export const orderItems = pgTable(
             precision: 12,
             scale: 2,
         }).notNull(),
+        hsnCode: varchar("hsn_code", { length: 8 }),
+        gstRate: numeric("gst_rate", { precision: 5, scale: 2 }),
+        taxableAmount: numeric("taxable_amount", {
+            precision: 12,
+            scale: 2,
+        }),
+        cgstAmount: numeric("cgst_amount", { precision: 12, scale: 2 }),
+        sgstAmount: numeric("sgst_amount", { precision: 12, scale: 2 }),
+        igstAmount: numeric("igst_amount", { precision: 12, scale: 2 }),
+        totalTax: numeric("total_tax", { precision: 12, scale: 2 }),
         fulfillmentStatus: vendorFulfillmentStatusEnum("fulfillment_status")
             .notNull().default("pending"),
 

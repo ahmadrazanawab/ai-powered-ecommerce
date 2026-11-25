@@ -7,6 +7,7 @@ import {
   orders,
   orderItems,
 } from "@/app/api/lib/schema/checkout-schema";
+import { invoiceGenerationJobs } from "@/app/api/lib/schema/invoice-schema";
 import { vendorProductSchema } from "@/app/api/lib/schema/vendor-product-schema";
 
 type Tx = Parameters<Parameters<typeof db.transaction>[0]>[0];
@@ -52,6 +53,13 @@ export async function refreshOrderStatus(
   tx: Tx,
   orderId: string
 ) {
+  const [previousOrder] = await tx
+    .select({ status: orders.status })
+    .from(orders)
+    .where(eq(orders.id, orderId))
+    .for("update")
+    .limit(1);
+
   const items = await tx
     .select({
       status: orderItems.fulfillmentStatus,
@@ -83,4 +91,13 @@ export async function refreshOrderStatus(
     .update(orders)
     .set({ status, updatedAt: new Date() })
     .where(eq(orders.id, orderId));
+
+  if (previousOrder?.status !== "delivered" && status === "delivered") {
+    await tx
+      .insert(invoiceGenerationJobs)
+      .values({ orderId })
+      .onConflictDoNothing({
+        target: invoiceGenerationJobs.orderId,
+      });
+  }
 }

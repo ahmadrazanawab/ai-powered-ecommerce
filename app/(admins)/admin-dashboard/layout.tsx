@@ -135,6 +135,11 @@ const navSections: NavSection[] = [
                 icon: "products",
             },
             {
+                label: "Invoice tax setup",
+                href: "/admin-dashboard/invoice-tax-settings",
+                icon: "products",
+            },
+            {
                 label: "Orders",
                 href: "/admin-dashboard/orders",
                 icon: "orders",
@@ -148,6 +153,11 @@ const navSections: NavSection[] = [
                 label: "Vendors",
                 href: "/admin-dashboard/vendors",
                 icon: "vendors",
+            },
+            {
+                label: "Business verification",
+                href: "/admin-dashboard/vendor-business-profiles",
+                icon: "approve",
             },
             {
                 label: "Customers",

@@ -63,6 +63,16 @@ export const NAV_ITEMS: NavItem[] = [
             </>
         ),
     },
+    {
+        label: "Business & Tax Information",
+        href: `${BASE}/business-tax-information`,
+        icon: (
+            <>
+                <path d="M4 21h16M6 18V8l6-5 6 5v10" />
+                <path d="M9 18v-5h6v5M9 9h.01M15 9h.01" />
+            </>
+        ),
+    },
 ];
 
 export function isActive(pathname: string, item: NavItem) {

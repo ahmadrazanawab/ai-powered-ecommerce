@@ -124,7 +124,7 @@ export async function POST(request: NextRequest) {
             expiresAt,
         });
 
-        if (process.env.NODE_ENV !== "production") {
+        if (process.env.NODE_ENV === "development") {
             console.log(
                 `[CUSTOMER OTP - DEVELOPMENT] ${identifier}: ${otp}`
             );
@@ -137,6 +137,9 @@ export async function POST(request: NextRequest) {
                 message:
                     "OTP generated. Check the server terminal during development.",
                 expiresIn: 300,
+                ...(process.env.NODE_ENV === "development"
+                    ? { developmentOtp: otp }
+                    : {}),
             },
             { status: 200 }
         );
